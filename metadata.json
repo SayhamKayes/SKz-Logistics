@@ -1,0 +1,6 @@
+{
+  "name": "SAIN International Logistics",
+  "description": "Fast, reliable and affordable global shipping solutions, air/sea freight, and end-to-end consignment tracking from Guangzhou to Dhaka and worldwide destinations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
