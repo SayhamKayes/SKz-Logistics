@@ -6,14 +6,10 @@ import {
   Mail,
   MapPin,
   Clock,
-  ShieldCheck,
-  Search,
-  ArrowRight,
-  Database,
 } from 'lucide-react';
 
 export const Footer: React.FC = () => {
-  const { setActiveTab, openTrackingModal, openQuoteModal, setDevDbModalOpen } = useTracking();
+  const { setActiveTab } = useTracking();
 
   const handleNav = (tab: 'home' | 'about' | 'services' | 'contact') => {
     setActiveTab(tab);
@@ -26,14 +22,10 @@ export const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           {/* Brand info (2 columns) */}
           <div className="lg:col-span-2 space-y-4">
-            <SainLogo />
+            <SainLogo variant="white" />
             <p className="text-xs sm:text-sm text-slate-400 leading-relaxed max-w-sm">
               SAIN Ship is a trusted international freight and courier partner connecting people and businesses with fast, secure, and reliable shipping services from Guangzhou and global hubs to Bangladesh.
             </p>
-            <div className="flex items-center gap-2 text-xs text-amber-400">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Full compliance with Bangladesh Customs Act 2023</span>
-            </div>
           </div>
 
           {/* Quick Links */}
@@ -45,7 +37,7 @@ export const Footer: React.FC = () => {
               <li>
                 <button
                   onClick={() => handleNav('home')}
-                  className="hover:text-amber-400 transition"
+                  className="hover:text-amber-400 transition cursor-pointer"
                 >
                   Home
                 </button>
@@ -53,7 +45,7 @@ export const Footer: React.FC = () => {
               <li>
                 <button
                   onClick={() => handleNav('about')}
-                  className="hover:text-amber-400 transition"
+                  className="hover:text-amber-400 transition cursor-pointer"
                 >
                   About Us
                 </button>
@@ -61,7 +53,7 @@ export const Footer: React.FC = () => {
               <li>
                 <button
                   onClick={() => handleNav('services')}
-                  className="hover:text-amber-400 transition"
+                  className="hover:text-amber-400 transition cursor-pointer"
                 >
                   Freight Services
                 </button>
@@ -69,18 +61,9 @@ export const Footer: React.FC = () => {
               <li>
                 <button
                   onClick={() => handleNav('contact')}
-                  className="hover:text-amber-400 transition"
+                  className="hover:text-amber-400 transition cursor-pointer"
                 >
                   Contact Us
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => openTrackingModal()}
-                  className="text-amber-400 font-bold hover:underline flex items-center gap-1"
-                >
-                  <Search className="w-3 h-3" />
-                  <span>Track Consignment</span>
                 </button>
               </li>
             </ul>
@@ -133,18 +116,26 @@ export const Footer: React.FC = () => {
         {/* Bottom Bar */}
         <div className="pt-8 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
           <div>
-            &copy; {new Date().getFullYear()} <strong>𝗦𝗔𝗜𝗡 International Logistics</strong>. All rights reserved.
+            &copy; {new Date().getFullYear()} <strong>SAIN International Logistics</strong>. All rights reserved.
           </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setDevDbModalOpen(true)}
-              className="hover:text-cyan-400 transition flex items-center gap-1 text-[11px]"
-            >
-              <Database className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Django &amp; PostgreSQL / Neon Config</span>
-            </button>
-            <span className="text-slate-700">•</span>
-            <span className="text-amber-500 font-bengali">সেঈন - True Soul of Bengal</span>
+
+          {/* Developed by ScaizLab (Supports ScaizLab logo auto-load when placed in assets) */}
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <span>Designed & Developed by</span>
+            <span className="inline-flex items-center gap-1.5 font-bold text-slate-200 hover:text-amber-400 transition">
+              <img
+                src="/assets/images/scaizlab_logo.png"
+                alt="ScaizLab"
+                className="h-4.5 w-auto object-contain hidden"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                }}
+                onLoad={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'inline-block';
+                }}
+              />
+              <span className="tracking-wide"><a href="https://theskzlab.com" target="_blank">SKzLAB</a></span>
+            </span>
           </div>
         </div>
       </div>
