@@ -6,3 +6,17 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Vercel
+.vercel
+
+# Python virtualenv & cache
+__pycache__/
+*.py[cod]
+*$py.class
+sain_env/
+.venv/
+venv/
+env/
+db.sqlite3
+
