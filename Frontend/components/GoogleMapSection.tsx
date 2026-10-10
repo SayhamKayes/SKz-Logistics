@@ -1,0 +1,105 @@
+import React from 'react';
+import { Navigation, ExternalLink } from 'lucide-react';
+
+/**
+ * =========================================================================
+ * 📍 GOOGLE MAP SECTION - LOCATION CONFIGURATION INSTRUCTIONS
+ * =========================================================================
+ * How to change or customize your Google Map location:
+ * 
+ * Option 1 (Simple Address Change):
+ * - Change the `LOCATION_ADDRESS` text below to any address or coordinates.
+ *   Example: "House 15, Road No. 5, Block B, Uttara-1230, Dhaka, Bangladesh"
+ * 
+ * Option 2 (Custom Google Maps Embed URL):
+ * - Go to Google Maps (https://maps.google.com).
+ * - Search your exact location, click "Share" -> "Embed a map".
+ * - Copy the `src="..."` URL from the iframe and paste it into `CUSTOM_EMBED_URL` below.
+ * - If `CUSTOM_EMBED_URL` is empty, the component automatically builds the embed.
+ * =========================================================================
+ */
+
+// 1. Address displayed on the location card
+export const LOCATION_ADDRESS = 'House 15, Road No. 5, Block B, Uttara-1230, Bangladesh';
+export const LOCATION_TITLE = 'SAIN International Logistics';
+
+// 2. Custom Embed URL (Leave empty to use automatic address query)
+const CUSTOM_EMBED_URL = '';
+
+export const GoogleMapSection: React.FC = () => {
+  // Build map URL if no custom URL is provided
+  const embedUrl =
+    CUSTOM_EMBED_URL ||
+    `https://maps.google.com/maps?q=${encodeURIComponent(
+      'SAIN International Logistics, House 15, Road 5, Block B, Uttara, Dhaka-1230, Bangladesh'
+    )}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+
+  const directionsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+    'SAIN International Logistics, House 15, Road 5, Block B, Uttara, Dhaka-1230, Bangladesh'
+  )}`;
+
+  return (
+    <section className="relative w-full bg-white p-0 m-0">
+      {/* Full-Width Edge-to-Edge Map Container (Flush against Footer) */}
+      <div className="relative w-full h-[480px] sm:h-[540px] md:h-[600px] overflow-hidden border-t border-slate-200 bg-slate-100 block">
+        {/* Google Maps iFrame */}
+        <iframe
+          title="SAIN International Logistics Google Maps Location"
+          src={embedUrl}
+          width="100%"
+          height="100%"
+          style={{ border: 0 }}
+          allowFullScreen
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          className="w-full h-full block grayscale-[0.15] contrast-[1.05]"
+        />
+
+        {/* Floating Location Card on Top-Left */}
+        <div className="absolute top-6 left-6 sm:top-8 sm:left-8 z-10 max-w-xs sm:max-w-sm bg-white/95 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-xl space-y-2 pointer-events-auto select-none">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h4 className="font-bold text-sm sm:text-base text-[#0f172a] leading-tight">
+                {LOCATION_TITLE}
+              </h4>
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                {LOCATION_ADDRESS}
+              </p>
+              <span className="text-[11px] text-slate-400 mt-0.5 block">
+                Verified Headquarters
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <a
+                href={directionsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="View directions on Google Maps"
+                className="p-1.5 text-slate-500 hover:text-[#153243] hover:bg-slate-100 rounded-lg transition"
+              >
+                <Navigation className="w-4 h-4 text-[#153243]" />
+              </a>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-emerald-700 font-semibold flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Open for Inquiries</span>
+            </span>
+            <a
+              href={directionsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#153243] font-bold hover:text-amber-600 flex items-center gap-1 transition"
+            >
+              <span>Directions</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
