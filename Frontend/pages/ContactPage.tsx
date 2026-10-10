@@ -1,14 +1,12 @@
 import React from 'react';
 import { ContactSection } from '../components/ContactSection';
-import { TrackingSection } from '../components/TrackingSection';
+import { GoogleMapSection } from '../components/GoogleMapSection';
 
 export const ContactPage: React.FC = () => {
   return (
-    <div className="pt-6">
+    <div className="bg-white">
       <ContactSection />
-      <div className="py-10">
-        <TrackingSection />
-      </div>
+      <GoogleMapSection />
     </div>
   );
 };
