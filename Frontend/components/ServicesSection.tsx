@@ -83,18 +83,18 @@ export const ServicesSection: React.FC = () => {
   ];
 
   return (
-    <section id="services" className="relative py-24 px-4 sm:px-8 z-10">
+    <section id="services" className="relative py-24 px-4 sm:px-8 z-10 bg-white">
       <div className="max-w-7xl mx-auto space-y-16">
         {/* Section Header */}
         <div className="text-center space-y-4 max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-400 text-xs font-semibold tracking-wider uppercase">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-teal-50 border border-teal-200 rounded-full text-[#1a6c7a] text-xs font-semibold tracking-wider uppercase">
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>Comprehensive Freight Solutions</span>
           </div>
-          <h2 className="text-3xl sm:text-5xl font-black font-brand text-slate-100 tracking-tight">
-            Tailored Logistics For <span className="text-amber-400">Global Commerce</span>
+          <h2 className="text-3xl sm:text-5xl font-black font-brand text-[#0f172a] tracking-tight">
+            Tailored Logistics For <span className="text-amber-500">Global Commerce</span>
           </h2>
-          <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
+          <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
             From urgent documents to industrial bulk consignments, we provide seamless door-to-door freight forwarding, professional customs clearance under the Customs Act 2023, and real-time shipment transparency.
           </p>
         </div>
@@ -106,7 +106,7 @@ export const ServicesSection: React.FC = () => {
             return (
               <div
                 key={srv.id}
-                className="glass-card rounded-3xl overflow-hidden border border-slate-700/80 hover:border-amber-500/40 transition-all duration-300 flex flex-col group shadow-2xl"
+                className="bg-white rounded-3xl overflow-hidden border border-slate-200/90 hover:border-[#1a6c7a] transition-all duration-300 flex flex-col group shadow-lg hover:shadow-xl"
               >
                 {/* Visual Asset Header */}
                 <div className="relative h-56 sm:h-64 w-full overflow-hidden bg-slate-900">
@@ -115,23 +115,23 @@ export const ServicesSection: React.FC = () => {
                     alt={srv.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
 
                   {/* Badge & Turnaround */}
                   <div className="absolute top-4 left-4 flex items-center gap-2">
-                    <span className="px-3 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-white/10 text-amber-400 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg">
-                      <IconComponent className="w-3.5 h-3.5" />
+                    <span className="px-3 py-1 rounded-full bg-white/90 backdrop-blur-md border border-slate-200 text-[#153243] font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md">
+                      <IconComponent className="w-3.5 h-3.5 text-[#1a6c7a]" />
                       <span>{srv.badge}</span>
                     </span>
                   </div>
 
-                  <div className="absolute bottom-4 right-4 bg-amber-500 text-slate-950 font-black text-xs px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-1">
+                  <div className="absolute bottom-4 right-4 bg-amber-500 text-slate-950 font-black text-xs px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5" />
                     <span>{srv.turnaround}</span>
                   </div>
 
                   <div className="absolute bottom-4 left-4">
-                    <h3 className="text-2xl sm:text-3xl font-black font-brand text-slate-100">
+                    <h3 className="text-2xl sm:text-3xl font-black font-brand text-white">
                       {srv.title}
                     </h3>
                   </div>
@@ -139,33 +139,33 @@ export const ServicesSection: React.FC = () => {
 
                 {/* Content Body */}
                 <div className="p-6 sm:p-8 flex-1 flex flex-col justify-between space-y-6">
-                  <p className="text-slate-300 text-sm leading-relaxed">
+                  <p className="text-slate-600 text-sm leading-relaxed">
                     {srv.description}
                   </p>
 
                   {/* Features Bullet List */}
-                  <div className="space-y-2.5 pt-2 border-t border-slate-800">
+                  <div className="space-y-2.5 pt-4 border-t border-slate-100">
                     {srv.features.map((feat, fIdx) => (
-                      <div key={fIdx} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-300">
-                        <CheckCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                      <div key={fIdx} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-700">
+                        <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
                         <span>{feat}</span>
                       </div>
                     ))}
                   </div>
 
                   {/* Bottom CTAs */}
-                  <div className="pt-4 flex items-center justify-between gap-4">
+                  <div className="pt-4 flex items-center justify-between gap-4 border-t border-slate-100">
                     <button
                       onClick={() => openQuoteModal()}
-                      className="px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-amber-500/20 transition flex items-center gap-2 cursor-pointer"
+                      className="px-6 py-3 bg-[#153243] hover:bg-[#1a6c7a] text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer"
                     >
                       <span>GET a quote</span>
-                      <ArrowRight className="w-4 h-4" />
+                      <ArrowRight className="w-4 h-4 text-amber-400" />
                     </button>
 
                     <button
                       onClick={() => openTrackingModal()}
-                      className="text-xs font-semibold text-slate-400 hover:text-amber-400 transition flex items-center gap-1"
+                      className="text-xs font-semibold text-slate-600 hover:text-[#1a6c7a] transition flex items-center gap-1 cursor-pointer"
                     >
                       <span>Track Shipment</span>
                       <ArrowRight className="w-3.5 h-3.5" />
