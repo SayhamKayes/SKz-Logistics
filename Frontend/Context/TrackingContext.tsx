@@ -11,6 +11,8 @@ interface TrackingContextType {
   activeTab: 'home' | 'about' | 'services' | 'contact' | 'track';
   isQuoteModalOpen: boolean;
   isDevDbModalOpen: boolean;
+  isHeaderVisible: boolean;
+  setHeaderVisible: (visible: boolean) => void;
   setActiveTab: (tab: 'home' | 'about' | 'services' | 'contact' | 'track') => void;
   openTrackingModal: (consignmentNumber?: string) => void;
   closeTrackingModal: () => void;
@@ -57,6 +59,7 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [activeTab, setActiveTab] = useState<'home' | 'about' | 'services' | 'contact' | 'track'>('home');
   const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
   const [isDevDbModalOpen, setDevDbModalOpen] = useState(false);
+  const [isHeaderVisible, setHeaderVisible] = useState(false);
 
   useEffect(() => {
     try {
@@ -161,6 +164,8 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         activeTab,
         isQuoteModalOpen,
         isDevDbModalOpen,
+        isHeaderVisible,
+        setHeaderVisible,
         setActiveTab,
         openTrackingModal,
         closeTrackingModal,
