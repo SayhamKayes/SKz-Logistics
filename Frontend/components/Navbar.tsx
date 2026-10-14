@@ -35,7 +35,7 @@ export const Navbar: React.FC = () => {
     { id: 'contact', label: 'Contact' },
   ] as const;
 
-  const handleNavClick = (tab: 'home' | 'about' | 'services' | 'contact') => {
+  const handleNavClick = (tab: any) => {
     setActiveTab(tab);
     setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
