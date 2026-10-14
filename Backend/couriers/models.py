@@ -1,26 +1,10 @@
 from django.db import models
 
 class Consignment(models.Model):
-    STATUS_CHOICES = [
-        ('RECEIVED', 'Received at Warehouse'),
-        ('IN_TRANSIT', 'In Transit'),
-        ('AT_HUB', 'At Sorting Hub'),
-        ('CUSTOMS', 'Customs Clearance (Act 2023)'),
-        ('OUT_FOR_DELIVERY', 'Out for Doorstep Delivery'),
-        ('DELIVERED', 'Delivered'),
-    ]
-
-    SERVICE_CHOICES = [
-        ('AIR_PRIORITY', 'Air Freight Priority'),
-        ('SEA_FREIGHT', 'Sea Freight (FCL/LCL)'),
-        ('HAND_CARRY', 'Hand Carry Express'),
-        ('EXPORT_WORLDWIDE', 'Export Worldwide'),
-    ]
-
     consignment_no = models.CharField(max_length=64, unique=True, db_index=True)
     reference_no = models.CharField(max_length=64, blank=True, null=True)
-    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default='RECEIVED')
-    service_type = models.CharField(max_length=32, choices=SERVICE_CHOICES, default='AIR_PRIORITY')
+    status = models.CharField(max_length=64, default='At Bangladesh warehouse', blank=True)
+    service_type = models.CharField(max_length=64, default='Air Freight Priority', blank=True)
     carrier = models.CharField(max_length=128, default='SAIN Direct Freight Network')
     awb_number = models.CharField(max_length=64, blank=True, null=True)
 
@@ -50,9 +34,47 @@ class Consignment(models.Model):
     duty_status = models.CharField(max_length=128, default='Duty Assessed & Cleared')
     assessment_station = models.CharField(max_length=255, default='Hazrat Shahjalal International Airport Customs House')
 
+    # Shipper Details
+    shipper_name = models.CharField(max_length=255, default='SAIN', blank=True)
+    shipper_phone = models.CharField(max_length=64, default='+880171906999', blank=True)
+    shipper_address = models.CharField(max_length=512, default='15/B, Uttara Metro Center, Dhaka 1230 Bangladesh', blank=True)
+    shipper_email = models.CharField(max_length=128, default='saininternationallogistics@gmail.com', blank=True)
+
+    # Receiver Details
+    receiver_name = models.CharField(max_length=255, blank=True, default='Muhammad Tahin')
+    receiver_phone = models.CharField(max_length=64, blank=True, default='+8801731939325')
+    receiver_address = models.CharField(max_length=512, blank=True, default='Basundhara Residential Area, Dhaka, D-block road 1, House: 252')
+    receiver_email = models.CharField(max_length=128, blank=True, default='ocuna123@gmail.com')
+
+    # Extended Shipment Details (matching admin panel)
+    type_of_shipment = models.CharField(max_length=64, default='Air Freight', blank=True)
+    weight_text = models.CharField(max_length=64, default='around 1500g', blank=True)
+    packages_count = models.CharField(max_length=32, default='7', blank=True)
+    product = models.CharField(max_length=255, blank=True, default='Keychain, Doll, Acrylic sheet')
+    payment_mode = models.CharField(max_length=64, default='CASH', blank=True)
+    departure_time_str = models.CharField(max_length=64, blank=True, default='18:52 pm')
+    pickup_time_str = models.CharField(max_length=64, blank=True, default='')
+    quantity = models.CharField(max_length=64, default='7 Box', blank=True)
+    total_freight = models.CharField(max_length=64, blank=True, default='')
+    carrier_reference_no = models.CharField(max_length=64, blank=True, default='')
+    pickup_date = models.CharField(max_length=64, blank=True, default='')
+    expected_delivery_date = models.CharField(max_length=64, blank=True, default='')
+    comments = models.TextField(blank=True, default='Total 7 store product.')
+    
+    # Packages table data (JSON)
+    packages_data = models.JSONField(default=list, blank=True)
+    
+    # Metadata & Admin controls
+    tags = models.CharField(max_length=255, blank=True, default='Guangzhou')
+    category = models.CharField(max_length=255, blank=True, default='Keychain Mix')
+    client = models.CharField(max_length=128, blank=True, default='')
+    agent_name = models.CharField(max_length=128, blank=True, default='')
+    employee = models.CharField(max_length=128, blank=True, default='')
+    published_status = models.CharField(max_length=64, default='Published', blank=True)
+
     # Consignee
-    consignee_name = models.CharField(max_length=128)
-    consignee_phone = models.CharField(max_length=32)
+    consignee_name = models.CharField(max_length=128, default='Muhammad Tahin')
+    consignee_phone = models.CharField(max_length=32, default='+8801731939325')
 
     progress_percentage = models.PositiveIntegerField(default=20)
     estimated_delivery = models.CharField(max_length=128, default='Within 48 hours')
@@ -61,19 +83,24 @@ class Consignment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.consignment_no} - {self.get_status_display()}"
+        return f"{self.consignment_no} - {self.status}"
 
 
 class Milestone(models.Model):
     consignment = models.ForeignKey(Consignment, related_name='milestones', on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
     location = models.CharField(max_length=255)
-    description = models.TextField()
-    status = models.CharField(max_length=32, default='completed') # completed, current, pending
+    description = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=64, default='In Transit') # Pending, Received, In Transit, At Bangladesh warehouse, etc.
+    date_str = models.CharField(max_length=32, blank=True, default='')
+    time_str = models.CharField(max_length=32, blank=True, default='')
+    updated_by = models.CharField(max_length=128, blank=True, default='SAIN International Logistics')
+    remarks = models.CharField(max_length=255, blank=True, default='')
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-timestamp']
+        ordering = ['id']
 
     def __str__(self):
         return f"{self.consignment.consignment_no} - {self.title} at {self.location}"
+
