@@ -138,6 +138,17 @@ export const TrackingModal: React.FC = () => {
             <span className="text-slate-400 text-[11px] font-medium">Quick Examples:</span>
             <button
               type="button"
+              onClick={() => handleQuickSelect('SAINEX067638406')}
+              className={`px-2.5 py-1 rounded-lg border text-[11px] font-mono transition ${
+                activeConsignment?.consignmentNo === 'SAINEX067638406'
+                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 font-bold'
+                  : 'bg-slate-800/80 border-slate-700 hover:border-slate-600 text-slate-300'
+              }`}
+            >
+              SAINEX067638406 <span className="text-emerald-400 font-sans text-[10px] font-bold">(China → BD Air Express)</span>
+            </button>
+            <button
+              type="button"
               onClick={() => handleQuickSelect('12345')}
               className={`px-2.5 py-1 rounded-lg border text-[11px] font-mono transition ${
                 activeConsignment?.consignmentNo === '12345'
@@ -204,8 +215,16 @@ export const TrackingModal: React.FC = () => {
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
                       activeConsignment.status === 'Delivered'
                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                        : activeConsignment.status === 'Out for Delivery'
+                        : activeConsignment.status?.toLowerCase().includes('out for delivery')
                         ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse'
+                        : activeConsignment.status === 'On Hold by Customs'
+                        ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40 animate-pulse'
+                        : activeConsignment.status === 'Cancelled' || activeConsignment.status === 'Returned'
+                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                        : activeConsignment.status === 'At Bangladesh warehouse'
+                        ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40'
+                        : activeConsignment.status === 'Received' || activeConsignment.status === 'Pending'
+                        ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
                         : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
                     }`}
                   >
@@ -379,71 +398,138 @@ export const TrackingModal: React.FC = () => {
 
             {/* Tab 2: Cargo & Consignee Details */}
             {activeTab === 'details' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Cargo Specs */}
-                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                    <Package className="w-4 h-4" />
-                    <span>Package & Cargo Specification</span>
-                  </h4>
-                  <div className="grid grid-cols-2 gap-2.5 text-xs">
-                    <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-                      <span className="text-slate-400 block text-[10px]">Gross Weight:</span>
-                      <strong className="text-slate-100 text-sm font-mono">{activeConsignment.cargoDetails.weight}</strong>
-                    </div>
-                    <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-                      <span className="text-slate-400 block text-[10px]">Total Pieces:</span>
-                      <strong className="text-slate-100 text-sm font-mono">{activeConsignment.cargoDetails.pieces} Cartons / Items</strong>
-                    </div>
-                    <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-                      <span className="text-slate-400 block text-[10px]">CBM Volume:</span>
-                      <strong className="text-slate-100 text-sm font-mono">{activeConsignment.cargoDetails.volume}</strong>
-                    </div>
-                    <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-                      <span className="text-slate-400 block text-[10px]">Dimensions:</span>
-                      <strong className="text-slate-100 text-xs font-mono">{activeConsignment.cargoDetails.dimensions}</strong>
+              <div className="space-y-4">
+                {/* Shipper & Receiver Section */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Shipper Info */}
+                  <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5 border-b border-slate-800 pb-1.5">
+                      <Building className="w-4 h-4" />
+                      <span>Shipper Details</span>
+                    </h4>
+                    <div className="text-xs space-y-1">
+                      <p><span className="text-slate-400">Shipper:</span> <strong className="text-slate-200">{activeConsignment.shipper?.name || 'SAIN Logistics (Guangzhou Hub)'}</strong></p>
+                      <p><span className="text-slate-400">Phone:</span> <span className="text-slate-200">{activeConsignment.shipper?.phone || '+880171906999'}</span></p>
+                      <p><span className="text-slate-400">Address:</span> <span className="text-slate-300">{activeConsignment.shipper?.address || '15/B, Uttara Metro Center, Dhaka'}</span></p>
+                      <p><span className="text-slate-400">Email:</span> <span className="text-slate-300">{activeConsignment.shipper?.email || 'saininternationallogistics@gmail.com'}</span></p>
                     </div>
                   </div>
-                  <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800 text-xs">
-                    <span className="text-slate-400 block text-[10px]">Goods Description:</span>
-                    <p className="text-slate-200 mt-0.5">{activeConsignment.cargoDetails.description}</p>
-                    {activeConsignment.cargoDetails.hsCode && (
-                      <span className="inline-block mt-1 text-[10px] text-amber-400/90 font-mono">
-                        HS Code: {activeConsignment.cargoDetails.hsCode}
-                      </span>
-                    )}
+
+                  {/* Receiver Info */}
+                  <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5 border-b border-slate-800 pb-1.5">
+                      <User className="w-4 h-4" />
+                      <span>Receiver Details</span>
+                    </h4>
+                    <div className="text-xs space-y-1">
+                      <p><span className="text-slate-400">Receiver:</span> <strong className="text-slate-200">{activeConsignment.receiver?.name || activeConsignment.consignee.name}</strong></p>
+                      <p><span className="text-slate-400">Phone:</span> <span className="text-slate-200">{activeConsignment.receiver?.phone || activeConsignment.consignee.phoneMasked}</span></p>
+                      <p><span className="text-slate-400">Address:</span> <span className="text-slate-300">{activeConsignment.receiver?.address || activeConsignment.destination.address}</span></p>
+                      <p><span className="text-slate-400">Email:</span> <span className="text-slate-300">{activeConsignment.receiver?.email || 'ocuna123@gmail.com'}</span></p>
+                    </div>
                   </div>
                 </div>
 
-                {/* Consignee & Carrier */}
-                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                    <User className="w-4 h-4" />
-                    <span>Consignee & Carrier Information</span>
-                  </h4>
-                  <div className="space-y-2 text-xs">
-                    <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-                      <span className="text-slate-400 block text-[10px]">Consignee / Importer:</span>
-                      <strong className="text-slate-100 text-sm">{activeConsignment.consignee.name}</strong>
-                      <span className="block text-[11px] text-slate-400 mt-0.5">
-                        Phone: {activeConsignment.consignee.phoneMasked} • Type: {activeConsignment.consignee.recipientType}
-                      </span>
+                {/* Cargo Specs & Carrier */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Cargo Specs */}
+                  <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                      <Package className="w-4 h-4" />
+                      <span>Package & Cargo Specification</span>
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2.5 text-xs">
+                      <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">Gross Weight:</span>
+                        <strong className="text-slate-100 text-sm font-mono">{activeConsignment.shipmentDetails?.weightText || activeConsignment.cargoDetails.weight}</strong>
+                      </div>
+                      <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">Total Pieces:</span>
+                        <strong className="text-slate-100 text-sm font-mono">{activeConsignment.shipmentDetails?.packagesCount || activeConsignment.cargoDetails.pieces} Cartons</strong>
+                      </div>
+                      <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">Payment Mode:</span>
+                        <strong className="text-amber-400 text-xs font-mono">{activeConsignment.shipmentDetails?.paymentMode || 'CASH'}</strong>
+                      </div>
+                      <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">Departure Time:</span>
+                        <strong className="text-slate-100 text-xs font-mono">{activeConsignment.shipmentDetails?.departureTimeStr || '18:52 pm'}</strong>
+                      </div>
                     </div>
-
-                    <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-                      <span className="text-slate-400 block text-[10px]">Assigned Carrier & Flight/Vessel:</span>
-                      <strong className="text-slate-100">{activeConsignment.carrier}</strong>
-                      <span className="block font-mono text-[11px] text-amber-400 mt-0.5">
-                        Airway Bill / BL: {activeConsignment.awbNumber}
-                      </span>
+                    <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800 text-xs">
+                      <span className="text-slate-400 block text-[10px]">Goods Description:</span>
+                      <p className="text-slate-200 mt-0.5">{activeConsignment.shipmentDetails?.product || activeConsignment.cargoDetails.description}</p>
+                      {activeConsignment.shipmentDetails?.comments && (
+                        <p className="text-slate-400 mt-1 italic">Note: {activeConsignment.shipmentDetails.comments}</p>
+                      )}
                     </div>
+                  </div>
 
-                    <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-                      <span className="text-slate-400 block text-[10px]">Final Delivery Address:</span>
-                      <p className="text-slate-200">{activeConsignment.destination.address}</p>
+                  {/* Consignee & Carrier */}
+                  <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                      <User className="w-4 h-4" />
+                      <span>Carrier & Corridor Routing</span>
+                    </h4>
+                    <div className="space-y-2 text-xs">
+                      <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">Assigned Carrier:</span>
+                        <strong className="text-slate-100">{activeConsignment.carrier}</strong>
+                        <span className="block font-mono text-[11px] text-amber-400 mt-0.5">
+                          Carrier Ref: {activeConsignment.referenceNo || 'CRN-884920'}
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">Routing Channel:</span>
+                        <strong className="text-slate-200">{activeConsignment.origin.city} ({activeConsignment.origin.country}) &rarr; {activeConsignment.destination.city} ({activeConsignment.destination.country})</strong>
+                      </div>
+
+                      <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">Destination Address:</span>
+                        <p className="text-slate-200">{activeConsignment.destination.address}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
+
+                {/* Packages Breakdown Table (If Available) */}
+                {activeConsignment.packagesData && activeConsignment.packagesData.length > 0 && (
+                  <div className="bg-slate-950/70 p-4 rounded-xl border border-slate-800 space-y-2.5">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                      <Layers className="w-4 h-4" />
+                      <span>Individual Packages Breakdown ({activeConsignment.packagesData.length})</span>
+                    </h4>
+                    <div className="overflow-x-auto border border-slate-800 rounded-lg">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-[#009b4d] text-white font-bold">
+                          <tr>
+                            <th className="py-2 px-3">Qty</th>
+                            <th className="py-2 px-3">Piece Type</th>
+                            <th className="py-2 px-3">Description / Tag</th>
+                            <th className="py-2 px-3">Length</th>
+                            <th className="py-2 px-3">Width</th>
+                            <th className="py-2 px-3">Height</th>
+                            <th className="py-2 px-3">Weight</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800 bg-slate-900/80 text-slate-200">
+                          {activeConsignment.packagesData.map((pkg, i) => (
+                            <tr key={pkg.id || i} className="hover:bg-slate-800/60">
+                              <td className="py-2 px-3 font-mono font-bold text-amber-400">{pkg.qty}</td>
+                              <td className="py-2 px-3">{pkg.pieceType}</td>
+                              <td className="py-2 px-3 font-mono">{pkg.description || '80595'}</td>
+                              <td className="py-2 px-3 font-mono">{pkg.lengthCm} cm</td>
+                              <td className="py-2 px-3 font-mono">{pkg.widthCm} cm</td>
+                              <td className="py-2 px-3 font-mono">{pkg.heightCm} cm</td>
+                              <td className="py-2 px-3 font-mono">{pkg.weightG} g</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -467,19 +553,19 @@ export const TrackingModal: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div className="bg-slate-900 p-3 rounded-lg border border-slate-800">
                     <span className="text-slate-400 text-[10px] block">Statutory Framework:</span>
-                    <strong className="text-slate-100">{activeConsignment.customsStatus.act}</strong>
+                    <strong className="text-slate-100">{activeConsignment.customsStatus?.act || 'Customs Act 2023 Compliant'}</strong>
                   </div>
                   <div className="bg-slate-900 p-3 rounded-lg border border-slate-800">
                     <span className="text-slate-400 text-[10px] block">Incoterms Trade Term:</span>
-                    <strong className="text-amber-400 font-mono">{activeConsignment.customsStatus.tradeTerm}</strong>
+                    <strong className="text-amber-400 font-mono">{activeConsignment.customsStatus?.tradeTerm || 'DAP (Delivered at Place)'}</strong>
                   </div>
                   <div className="bg-slate-900 p-3 rounded-lg border border-slate-800">
                     <span className="text-slate-400 text-[10px] block">Assessment Station:</span>
-                    <strong className="text-slate-200">{activeConsignment.customsStatus.assessmentStation}</strong>
+                    <strong className="text-slate-200">{activeConsignment.customsStatus?.assessmentStation || 'Dhaka Airport Customs House'}</strong>
                   </div>
                   <div className="bg-slate-900 p-3 rounded-lg border border-slate-800">
                     <span className="text-slate-400 text-[10px] block">Duty Clearance Status:</span>
-                    <strong className="text-emerald-400">{activeConsignment.customsStatus.dutyStatus}</strong>
+                    <strong className="text-emerald-400">{activeConsignment.customsStatus?.dutyStatus || 'Pre-cleared / Verified'}</strong>
                   </div>
                 </div>
               </div>
