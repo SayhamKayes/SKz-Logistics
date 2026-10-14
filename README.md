@@ -1,4 +1,4 @@
-# ✈️ SAIN International Logistics — Enterprise Freight & Consignment Tracking Suite
+# ✈️ SAIN International Logistics - Enterprise Freight & Consignment Tracking Suite
 
 <div align="center">
 
@@ -14,7 +14,7 @@ Connecting Guangzhou/Global Air-Sea Terminals directly to Bangladesh Doorstep de
 [![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-v4.0-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Vite](https://img.shields.io/badge/Vite-8.x-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![License](https://img.shields.io/badge/License-Proprietary-amber)](#)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 [Features](#-key-features) •
 [Architecture](#-system-architecture) •
@@ -22,7 +22,7 @@ Connecting Guangzhou/Global Air-Sea Terminals directly to Bangladesh Doorstep de
 [Data Flow](#-real-time-synchronization-workflow) •
 [API Reference](#-rest-api-reference) •
 [Quick Start](#-installation--setup) •
-[Admin Portal](#-admin-management-portal)
+[License](#-license)
 
 </div>
 
@@ -368,6 +368,19 @@ The platform includes built-in compliance tracking with the **Bangladesh Customs
 - **Statutory Framework**: Formulated according to National Board of Revenue (NBR) digital customs guidelines.
 - **Incoterms Support**: Full documentation for `DAP` (Delivered at Place), `CFR` (Cost & Freight), and `FOB` (Free on Board).
 - **Customs Stations**: Pre-linked with Hazrat Shahjalal International Airport (HSIA), Chittagong Sea Port, and Kamalapur ICD.
+
+---
+
+## 📄 License
+
+This project is open-sourced under the [MIT License](./LICENSE).
+
+```text
+MIT License
+Copyright (c) 2026 Sayham Kayes
+```
+
+You are permitted to freely use, modify, distribute, and integrate this software in commercial and personal applications. For full terms, please refer directly to the [LICENSE](./LICENSE) document.
 
 ---
 
