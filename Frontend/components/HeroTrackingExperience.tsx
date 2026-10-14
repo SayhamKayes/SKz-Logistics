@@ -548,7 +548,7 @@ export const HeroTrackingExperience: React.FC = () => {
                         setInputVal(e.target.value);
                         if (errorText) setErrorText('');
                       }}
-                      placeholder="Enter the Consignment No. Ex: 12345"
+                      placeholder="Enter Consignment No. Ex: SAINEX067638406 or 12345"
                       className="w-full bg-slate-50 border-2 border-slate-200 hover:border-slate-300 focus:border-[#1a6c7a] focus:bg-white focus:ring-4 focus:ring-teal-500/10 rounded-2xl px-5 py-4 pl-12 text-slate-900 placeholder-slate-400 text-base sm:text-lg focus:outline-none transition font-mono shadow-inner"
                     />
                     <Search className="w-5 h-5 text-[#1a6c7a] absolute left-4.5 top-4.5" />
