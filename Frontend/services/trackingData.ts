@@ -10,8 +10,23 @@ export interface Milestone {
 export interface Consignment {
   consignmentNo: string;
   referenceNo?: string;
-  status: 'Delivered' | 'Out for Delivery' | 'Customs Clearance' | 'In Flight' | 'At Hub' | 'Received at Warehouse';
-  statusColor: 'green' | 'amber' | 'blue' | 'purple';
+  status:
+    | 'Delivered'
+    | 'Out for Delivery'
+    | 'Customs Clearance'
+    | 'In Flight'
+    | 'At Hub'
+    | 'Received at Warehouse'
+    | 'At Bangladesh warehouse'
+    | 'In Transit'
+    | 'Pending'
+    | 'Received'
+    | 'On Hold by Customs'
+    | 'Enroute'
+    | 'Cancelled'
+    | 'Returned'
+    | (string & {});
+  statusColor: 'green' | 'amber' | 'blue' | 'purple' | 'red';
   progressPercentage: number;
   origin: {
     city: string;
@@ -25,7 +40,15 @@ export interface Consignment {
     country: string;
     code: string;
   };
-  serviceType: 'Air Freight Priority' | 'Sea Freight (FCL/LCL)' | 'Hand Carry Express' | 'Export Worldwide';
+  serviceType:
+    | 'Air Freight Priority'
+    | 'Sea Freight (FCL/LCL)'
+    | 'Hand Carry Express'
+    | 'Export Worldwide'
+    | 'Air Freight'
+    | 'Sea Freight'
+    | 'Hand Carry'
+    | (string & {});
   carrier: string;
   awbNumber: string;
   departureDate: string;
@@ -39,7 +62,7 @@ export interface Consignment {
     description: string;
     hsCode?: string;
   };
-  customsStatus: {
+  customsStatus?: {
     act: string;
     tradeTerm: string;
     dutyStatus: string;
@@ -51,9 +74,202 @@ export interface Consignment {
     recipientType: string;
   };
   timeline: Milestone[];
+
+  // Rich Admin Panel & Screenshot Details
+  author?: string;
+  shipper?: {
+    name: string;
+    phone: string;
+    address: string;
+    email: string;
+  };
+  receiver?: {
+    name: string;
+    phone: string;
+    address: string;
+    email: string;
+  };
+  shipmentDetails?: {
+    typeOfShipment: string;
+    weightText: string;
+    packagesCount: string;
+    product: string;
+    paymentMode: string;
+    carrier: string;
+    departureTimeStr: string;
+    destination: string;
+    pickupTimeStr: string;
+    courier: string;
+    mode: string;
+    quantity: string;
+    totalFreight: string;
+    carrierReferenceNo: string;
+    origin: string;
+    pickupDate: string;
+    expectedDeliveryDate: string;
+    comments: string;
+  };
+  packagesData?: PackageItem[];
+  shipmentHistory?: ShipmentHistoryItem[];
+  adminMetadata?: {
+    client?: string;
+    agentName?: string;
+    employee?: string;
+    publishStatus?: string;
+    publishedOn?: string;
+    tags?: string[];
+    categories?: string[];
+  };
+}
+
+export interface PackageItem {
+  id: string;
+  qty: number;
+  pieceType: string;
+  description: string;
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+  weightG: number;
+}
+
+export interface ShipmentHistoryItem {
+  id: string;
+  date: string;
+  time: string;
+  location: string;
+  status: string;
+  updatedBy: string;
+  remarks: string;
 }
 
 export const INITIAL_CONSIGNMENTS: Record<string, Consignment> = {
+  // Official SAINEX consignment matching admin panel screenshots
+  'SAINEX067638406': {
+    consignmentNo: 'SAINEX067638406',
+    referenceNo: 'CRN-884920',
+    status: 'At Bangladesh warehouse',
+    statusColor: 'green',
+    progressPercentage: 85,
+    author: 'SAIN International Logistics (sain_sakib6055)',
+    shipper: {
+      name: 'SAIN',
+      phone: '+880171906999',
+      address: '15/B, Uttara Metro Center, Dhaka 1230 Bangladesh',
+      email: 'saininternationallogistics@gmail.com',
+    },
+    receiver: {
+      name: 'Muhammad Tahin',
+      phone: '+8801731939325',
+      address: 'Basundhara Residential Area, Dhaka, D-block road 1, House: 252',
+      email: 'ocuna123@gmail.com',
+    },
+    shipmentDetails: {
+      typeOfShipment: 'Air Freight',
+      weightText: 'around 1500g',
+      packagesCount: '7',
+      product: 'Keychain, Doll, Acrylic sheet',
+      paymentMode: 'CASH',
+      carrier: 'SAINEX',
+      departureTimeStr: '18:52 pm',
+      destination: 'Bangladesh',
+      pickupTimeStr: '10:00 am',
+      courier: 'SAIN INTERNATIONAL LOGISTICS',
+      mode: 'Air Freight',
+      quantity: '7 Box',
+      totalFreight: '৳ 12,500',
+      carrierReferenceNo: 'CRN-884920',
+      origin: 'China',
+      pickupDate: '2026-08-01',
+      expectedDeliveryDate: '2026-08-12',
+      comments: 'Total 7 store product.',
+    },
+    packagesData: [
+      { id: 'p1', qty: 1, pieceType: 'Carton', description: '80595', lengthCm: 0, widthCm: 0, heightCm: 0, weightG: 0 },
+      { id: 'p2', qty: 1, pieceType: 'Carton', description: '46182', lengthCm: 0, widthCm: 0, heightCm: 0, weightG: 0 },
+      { id: 'p3', qty: 1, pieceType: 'Carton', description: '46089', lengthCm: 0, widthCm: 0, heightCm: 0, weightG: 0 },
+      { id: 'p4', qty: 1, pieceType: 'Carton', description: '33242', lengthCm: 0, widthCm: 0, heightCm: 0, weightG: 0 },
+      { id: 'p5', qty: 1, pieceType: 'Carton', description: '33260', lengthCm: 0, widthCm: 0, heightCm: 0, weightG: 0 },
+      { id: 'p6', qty: 1, pieceType: 'Carton', description: '66924', lengthCm: 0, widthCm: 0, heightCm: 0, weightG: 0 },
+      { id: 'p7', qty: 1, pieceType: 'Carton', description: '60831', lengthCm: 0, widthCm: 0, heightCm: 0, weightG: 0 },
+    ],
+    shipmentHistory: [
+      { id: 'sh1', date: '2026-08-11', time: '13:46 pm', location: 'Bangladesh', status: 'At Bangladesh warehouse', updatedBy: 'SAIN International Logistics', remarks: 'Contact via' },
+      { id: 'sh2', date: '2026-08-07', time: '14:00 pm', location: 'China', status: 'In Transit', updatedBy: 'SAIN International Logistics', remarks: 'Contact via' },
+      { id: 'sh3', date: '2026-08-01', time: '19:47 pm', location: 'China', status: 'Received', updatedBy: 'SAIN International Logistics', remarks: 'Contact via' },
+    ],
+    adminMetadata: {
+      client: '',
+      agentName: '',
+      employee: '',
+      publishStatus: 'Published',
+      publishedOn: 'Aug 11, 2026 at 13:39',
+      tags: ['Guangzhou'],
+      categories: ['Keychain Mix'],
+    },
+    origin: {
+      city: 'Guangzhou',
+      hub: 'SAIN Guangzhou Cargo Center, Baiyun District',
+      country: 'China',
+      code: 'CAN',
+    },
+    destination: {
+      city: 'Dhaka',
+      address: 'Basundhara Residential Area, Dhaka, D-block road 1, House: 252',
+      country: 'Bangladesh',
+      code: 'DAC',
+    },
+    serviceType: 'Air Freight Priority',
+    carrier: 'SAINEX Direct Air Network',
+    awbNumber: 'CAN-SAINEX-067638406',
+    departureDate: 'Aug 07, 2026 - 14:00',
+    estimatedDelivery: 'Aug 12, 2026 - Delivered soon',
+    cargoDetails: {
+      pieces: 7,
+      weight: 'around 1500g',
+      dimensions: '7 Cartons Export Standard',
+      volume: '0.12 CBM',
+      description: 'Keychain, Doll, Acrylic sheet (Total 7 store product)',
+      hsCode: '3926.90.99',
+    },
+    customsStatus: {
+      act: 'Compliant with Bangladesh Customs Act 2023',
+      tradeTerm: 'CFR Dhaka',
+      dutyStatus: 'Duty Assessed & Cleared',
+      assessmentStation: 'Hazrat Shahjalal International Airport Customs House',
+    },
+    consignee: {
+      name: 'Muhammad Tahin',
+      phoneMasked: '+880 1731 ***325',
+      recipientType: 'Individual Importer',
+    },
+    timeline: [
+      {
+        id: 't1',
+        timestamp: 'Aug 11, 2026 • 13:46 pm',
+        location: 'Bangladesh',
+        title: 'At Bangladesh warehouse',
+        description: 'Cargo received safely at SAIN Bangladesh Warehouse, customs inspection passed.',
+        status: 'current',
+      },
+      {
+        id: 't2',
+        timestamp: 'Aug 07, 2026 • 14:00 pm',
+        location: 'China',
+        title: 'In Transit',
+        description: 'Flight en route from Guangzhou to Hazrat Shahjalal International Airport (DAC).',
+        status: 'completed',
+      },
+      {
+        id: 't3',
+        timestamp: 'Aug 01, 2026 • 19:47 pm',
+        location: 'China',
+        title: 'Received at Guangzhou Hub',
+        description: 'Cargo collected from supplier, 7 cartons packaged and barcode tagged.',
+        status: 'completed',
+      },
+    ],
+  },
   // Official example from saininternationallogistics.com ("Ex: 12345")
   '12345': {
     consignmentNo: '12345',
@@ -530,3 +746,19 @@ export function getOrCreateConsignment(query: string): Consignment {
     ],
   };
 }
+
+export const getStatusProgressAndColor = (
+  statusStr: string
+): { progress: number; color: 'green' | 'amber' | 'blue' | 'purple' | 'red' } => {
+  const s = (statusStr || '').toLowerCase();
+  if (s.includes('delivered')) return { progress: 100, color: 'green' };
+  if (s.includes('out for delivery')) return { progress: 90, color: 'green' };
+  if (s.includes('bangladesh warehouse') || s.includes('warehouse')) return { progress: 85, color: 'green' };
+  if (s.includes('customs')) return { progress: 70, color: 'amber' };
+  if (s.includes('in transit')) return { progress: 60, color: 'blue' };
+  if (s.includes('enroute')) return { progress: 50, color: 'blue' };
+  if (s.includes('received')) return { progress: 25, color: 'blue' };
+  if (s.includes('pending')) return { progress: 10, color: 'amber' };
+  if (s.includes('cancelled') || s.includes('returned')) return { progress: 0, color: 'red' };
+  return { progress: 65, color: 'blue' };
+};
