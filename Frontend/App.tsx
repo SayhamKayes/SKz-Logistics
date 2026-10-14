@@ -6,9 +6,15 @@ import { AboutPage } from './pages/AboutPage';
 import { ServicesPage } from './pages/ServicesPage';
 import { ContactPage } from './pages/ContactPage';
 import { TrackPage } from './pages/TrackPage';
+import { AdminPage } from './pages/AdminPage';
 
 const AppContent: React.FC = () => {
   const { activeTab } = useTracking();
+
+  // Standalone Admin Portal (Full screen, login-gated, independent from public layout)
+  if (activeTab === 'admin') {
+    return <AdminPage />;
+  }
 
   return (
     <MainLayout>
