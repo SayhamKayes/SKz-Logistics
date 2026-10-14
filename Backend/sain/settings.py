@@ -5,9 +5,11 @@ Supports dynamic switching between PostgreSQL, Neon.tech, and Supabase.
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
 import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-sain-logistics-2026-secret-key-bangladesh')
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
