@@ -4,7 +4,7 @@ from .models import Consignment, Milestone
 class MilestoneSerializer(serializers.ModelSerializer):
     class Meta:
         model = Milestone
-        fields = ['id', 'title', 'location', 'description', 'status', 'timestamp']
+        fields = '__all__'
 
 class ConsignmentSerializer(serializers.ModelSerializer):
     milestones = MilestoneSerializer(many=True, read_only=True)
