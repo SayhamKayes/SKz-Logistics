@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useTracking } from '../Context/TrackingContext';
 import { SainLogo } from '../assets/Logo';
+import { HeroConfig, DEFAULT_HERO_CONFIG } from './admin/HomeContentEditor';
 import {
   ShieldCheck,
   MapPin,
@@ -20,6 +21,29 @@ export const HeroTrackingExperience: React.FC = () => {
     isLoading,
     allConsignments,
   } = useTracking();
+
+  const [heroConfig, setHeroConfig] = useState<HeroConfig>(() => {
+    try {
+      const stored = localStorage.getItem('sain_hero_content_config');
+      if (stored) return { ...DEFAULT_HERO_CONFIG, ...JSON.parse(stored) };
+    } catch {}
+    return DEFAULT_HERO_CONFIG;
+  });
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      try {
+        const stored = localStorage.getItem('sain_hero_content_config');
+        if (stored) setHeroConfig({ ...DEFAULT_HERO_CONFIG, ...JSON.parse(stored) });
+      } catch {}
+    };
+    window.addEventListener('sain_hero_content_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('sain_hero_content_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const heroVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -317,27 +341,23 @@ export const HeroTrackingExperience: React.FC = () => {
           >
             <div className="flex flex-col items-center text-center space-y-4 max-w-2xl pointer-events-auto">
               <span className="text-lg sm:text-xl font-extrabold tracking-[0.3em] uppercase text-[#FE9A00] drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
-                WELCOME TO
+                {heroConfig.welcomeText}
               </span>
 
               <div className="py-2">
                 <img
-                  src="/assets/images/SAIN_logo_gold.png"
+                  src={heroConfig.logoUrl}
                   alt="SAIN International Logistics"
                   className="h-14 sm:h-20 md:h-24 w-auto object-contain drop-shadow-[0_4px_16px_rgba(0,0,0,0.9)]"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/assets/images/SAIN_logo_gold.png';
+                  }}
                 />
               </div>
 
               <p className="text-slate-100 text-lg sm:text-xl md:text-2xl font-medium leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
-                True Soul of Bengal
+                {heroConfig.slogan}
               </p>
-
-              {/* <div className="pt-3 flex flex-col items-center justify-center gap-2 text-slate-300 text-xs">
-                <span className="font-bold text-amber-400 tracking-widest uppercase text-[11px] drop-shadow-md">
-                  Scroll to Begin
-                </span>
-                <ChevronDown className="w-5 h-5 text-amber-400 animate-bounce drop-shadow-md" />
-              </div> */}
             </div>
           </div>
 
@@ -354,14 +374,22 @@ export const HeroTrackingExperience: React.FC = () => {
                 }}
               >
                 <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black font-brand tracking-tight text-white leading-[1.12] drop-shadow-sm">
-                  Fast, reliable and affordable shipping solutions,{' '}
-                  <span className="text-amber-400">deliver to your doorstep</span>
+                  {(() => {
+                    if (heroConfig.headlineHighlight && heroConfig.headline.includes(heroConfig.headlineHighlight)) {
+                      const parts = heroConfig.headline.split(heroConfig.headlineHighlight);
+                      return (
+                        <>
+                          {parts[0]}
+                          <span className="text-amber-400">{heroConfig.headlineHighlight}</span>
+                          {parts.slice(1).join(heroConfig.headlineHighlight)}
+                        </>
+                      );
+                    }
+                    return heroConfig.headline;
+                  })()}
                 </h1>
                 <p className="text-slate-200 text-sm sm:text-base lg:text-lg leading-relaxed max-w-2xl font-normal drop-shadow-sm">
-                  At <b>SAIN</b> we understand the importance of timely deliveries. From
-                  urgent documents to bulky packages, we provide seamless shipping
-                  services tailored to your needs. Track your shipment anytime,
-                  anywhere and experience stress-free delivery.
+                  {heroConfig.description}
                 </p>
               </div>
 
@@ -502,7 +530,7 @@ export const HeroTrackingExperience: React.FC = () => {
                 }}
               >
                 <Package className="w-3.5 h-3.5" />
-                <span>Real-Time Consignment Tracker</span>
+                <span>{heroConfig.trackingBadge}</span>
               </div>
 
               <h2
@@ -513,8 +541,8 @@ export const HeroTrackingExperience: React.FC = () => {
                     whitePhase > 0.5 ? 'none' : '0 1px 2px rgba(0,0,0,0.3)',
                 }}
               >
-                Track Your Shipment{' '}
-                <span className="text-amber-500">Anytime, Anywhere</span>
+                {heroConfig.trackingHeading}{' '}
+                <span className="text-amber-500">{heroConfig.trackingHeadingHighlight}</span>
               </h2>
 
               <p
@@ -523,9 +551,7 @@ export const HeroTrackingExperience: React.FC = () => {
                   color: whitePhase > 0.5 ? '#475569' : '#e2e8f0',
                 }}
               >
-                Experience stress-free global freight visibility. Monitor air,
-                sea, and courier shipments directly from Guangzhou and
-                international hubs to your doorstep in Bangladesh.
+                {heroConfig.trackingDescription}
               </p>
             </div>
 
@@ -548,7 +574,7 @@ export const HeroTrackingExperience: React.FC = () => {
                         setInputVal(e.target.value);
                         if (errorText) setErrorText('');
                       }}
-                      placeholder="Enter Consignment No. Ex: SAINEX067638406"
+                      placeholder={heroConfig.trackingPlaceholder || "Enter Consignment No. Ex: SAINEX067638406"}
                       className="w-full bg-slate-50 border-2 border-slate-200 hover:border-slate-300 focus:border-[#1a6c7a] focus:bg-white focus:ring-4 focus:ring-teal-500/10 rounded-2xl px-5 py-4 pl-12 text-slate-900 placeholder-slate-400 text-base sm:text-lg focus:outline-none transition font-mono shadow-inner"
                     />
                     <Search className="w-5 h-5 text-[#1a6c7a] absolute left-4.5 top-4.5" />
