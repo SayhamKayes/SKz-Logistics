@@ -4,7 +4,18 @@ import { Save, CheckCircle, Sparkles, Layout } from 'lucide-react';
 export const HomeContentEditor: React.FC = () => {
   const [headline, setHeadline] = useState('Connecting Bangladesh to Global Commerce');
   const [tagline, setTagline] = useState('Door-to-door express freight forwarding, transparent customs clearance under Customs Act 2023, and real-time cargo visibility.');
-  const [trackingPlaceholder, setTrackingPlaceholder] = useState('Enter Consignment No. Ex: SAINEX067638406 or 12345');
+  const [trackingPlaceholder, setTrackingPlaceholder] = useState(() => {
+    try {
+      const stored = localStorage.getItem('sain_home_content_config');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.trackingPlaceholder) {
+          return parsed.trackingPlaceholder.replace(/\s+or\s+12345/i, '');
+        }
+      }
+    } catch {}
+    return 'Enter Consignment No. Ex: SAINEX067638406';
+  });
   const [statCountries, setStatCountries] = useState('140+');
   const [statAccuracy, setStatAccuracy] = useState('99.4%');
   const [statContainers, setStatContainers] = useState('12,000+');
