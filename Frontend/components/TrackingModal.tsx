@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTracking } from '../Context/TrackingContext';
 import {
   X,
@@ -26,6 +26,7 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
+import { getStatusProgressAndColor, buildConsignmentTimeline } from '../services/trackingData';
 
 export const TrackingModal: React.FC = () => {
   const {
@@ -38,9 +39,54 @@ export const TrackingModal: React.FC = () => {
     searchHistory,
   } = useTracking();
 
-  const [inputVal, setInputVal] = useState(activeConsignment?.consignmentNo || '12345');
+  const [inputVal, setInputVal] = useState(activeConsignment?.consignmentNo || '');
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'timeline' | 'details' | 'customs'>('timeline');
+
+  // Sync search input when activeConsignment changes
+  useEffect(() => {
+    if (activeConsignment?.consignmentNo) {
+      setInputVal(activeConsignment.consignmentNo);
+    }
+  }, [activeConsignment]);
+
+  // Synchronized timeline ensuring the active milestone corresponds directly to activeConsignment.status
+  const activeTimeline = useMemo(() => {
+    if (!activeConsignment) return [];
+
+    const list = buildConsignmentTimeline(
+      activeConsignment.status,
+      activeConsignment.shipmentHistory && activeConsignment.shipmentHistory.length > 0
+        ? activeConsignment.shipmentHistory
+        : activeConsignment.timeline?.map((t, idx) => ({
+            id: t.id || `h-${idx}`,
+            date: t.timestamp?.split('•')[0]?.trim() || '',
+            time: t.timestamp?.split('•')[1]?.trim() || '',
+            location: t.location,
+            status: t.title,
+            updatedBy: 'SAIN Logistics',
+            remarks: t.description,
+          })) || [],
+      activeConsignment.origin?.city || 'China',
+      activeConsignment.destination?.city || 'Bangladesh'
+    );
+
+    const normCurrent = (activeConsignment.status || '').toLowerCase().trim();
+    const isDelivered = normCurrent.includes('delivered');
+
+    let hasCurrent = false;
+    return list.map((step) => {
+      const stepNorm = (step.title || '').toLowerCase().trim();
+      const isMatch = stepNorm.includes(normCurrent) || normCurrent.includes(stepNorm);
+      const isCurrent = !isDelivered && (step.status === 'current' || (!hasCurrent && isMatch));
+      if (isCurrent) hasCurrent = true;
+      return {
+        ...step,
+        isCurrent,
+        isDone: isDelivered || step.status === 'completed' || (!isCurrent && hasCurrent),
+      };
+    });
+  }, [activeConsignment]);
 
   if (!isTrackingModalOpen) return null;
 
@@ -49,11 +95,6 @@ export const TrackingModal: React.FC = () => {
     if (inputVal.trim()) {
       searchConsignment(inputVal);
     }
-  };
-
-  const handleQuickSelect = (code: string) => {
-    setInputVal(code);
-    searchConsignment(code);
   };
 
   const copyTrackingNumber = () => {
@@ -101,7 +142,7 @@ export const TrackingModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Search Bar Bar inside modal */}
+        {/* Search Bar inside modal */}
         <div className="p-6 bg-slate-950/50 border-b border-slate-800/80">
           <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
@@ -109,7 +150,7 @@ export const TrackingModal: React.FC = () => {
                 type="text"
                 value={inputVal}
                 onChange={(e) => setInputVal(e.target.value)}
-                placeholder="Enter the Consignment No. Ex: 12345"
+                placeholder="Enter Consignment No. Ex: SAINEX067638406"
                 className="w-full bg-slate-800/90 border border-slate-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 rounded-xl px-4 py-3 pl-11 text-sm text-slate-100 placeholder-slate-400 focus:outline-none transition shadow-inner font-mono font-medium"
               />
               <Search className="w-5 h-5 text-amber-400 absolute left-3.5 top-3.5" />
@@ -132,59 +173,10 @@ export const TrackingModal: React.FC = () => {
               )}
             </button>
           </form>
-
-          {/* Quick preset samples */}
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-slate-400 text-[11px] font-medium">Quick Examples:</span>
-            <button
-              type="button"
-              onClick={() => handleQuickSelect('SAINEX067638406')}
-              className={`px-2.5 py-1 rounded-lg border text-[11px] font-mono transition ${
-                activeConsignment?.consignmentNo === 'SAINEX067638406'
-                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 font-bold'
-                  : 'bg-slate-800/80 border-slate-700 hover:border-slate-600 text-slate-300'
-              }`}
-            >
-              SAINEX067638406 <span className="text-emerald-400 font-sans text-[10px] font-bold">(China → BD Air Express)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickSelect('12345')}
-              className={`px-2.5 py-1 rounded-lg border text-[11px] font-mono transition ${
-                activeConsignment?.consignmentNo === '12345'
-                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 font-bold'
-                  : 'bg-slate-800/80 border-slate-700 hover:border-slate-600 text-slate-300'
-              }`}
-            >
-              12345 <span className="text-slate-400 font-sans text-[10px]">(Official Air Freight)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickSelect('SAIN-78492-BD')}
-              className={`px-2.5 py-1 rounded-lg border text-[11px] font-mono transition ${
-                activeConsignment?.consignmentNo === 'SAIN-78492-BD'
-                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 font-bold'
-                  : 'bg-slate-800/80 border-slate-700 hover:border-slate-600 text-slate-300'
-              }`}
-            >
-              SAIN-78492-BD <span className="text-slate-400 font-sans text-[10px]">(Guangzhou Delivered)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickSelect('SAIN-SEA-99120')}
-              className={`px-2.5 py-1 rounded-lg border text-[11px] font-mono transition ${
-                activeConsignment?.consignmentNo === 'SAIN-SEA-99120'
-                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 font-bold'
-                  : 'bg-slate-800/80 border-slate-700 hover:border-slate-600 text-slate-300'
-              }`}
-            >
-              SAIN-SEA-99120 <span className="text-slate-400 font-sans text-[10px]">(Ocean FCL Vessel)</span>
-            </button>
-          </div>
         </div>
 
         {/* Tracking Details View */}
-        {activeConsignment && (
+        {activeConsignment ? (
           <div className="p-6 space-y-6 max-h-[68vh] overflow-y-auto">
             {/* Top Status Card */}
             <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-5 shadow-lg">
@@ -212,21 +204,20 @@ export const TrackingModal: React.FC = () => {
 
                 <div className="flex flex-wrap items-center gap-2">
                   <span
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                      activeConsignment.status === 'Delivered'
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${activeConsignment.status === 'Delivered'
                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
                         : activeConsignment.status?.toLowerCase().includes('out for delivery')
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse'
-                        : activeConsignment.status === 'On Hold by Customs'
-                        ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40 animate-pulse'
-                        : activeConsignment.status === 'Cancelled' || activeConsignment.status === 'Returned'
-                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
-                        : activeConsignment.status === 'At Bangladesh warehouse'
-                        ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40'
-                        : activeConsignment.status === 'Received' || activeConsignment.status === 'Pending'
-                        ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
-                        : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
-                    }`}
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse'
+                          : activeConsignment.status === 'On Hold by Customs'
+                            ? 'bg-orange-500/20 text-orange-400 border border-orange-500/40 animate-pulse'
+                            : activeConsignment.status === 'Cancelled' || activeConsignment.status === 'Returned'
+                              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                              : activeConsignment.status === 'At Bangladesh warehouse'
+                                ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40'
+                                : activeConsignment.status === 'Received' || activeConsignment.status === 'Pending'
+                                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
+                                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                      }`}
                   >
                     <span className="w-2 h-2 rounded-full bg-current" />
                     {activeConsignment.status}
@@ -260,22 +251,39 @@ export const TrackingModal: React.FC = () => {
                 </div>
 
                 {/* Progress bar connecting the corridor */}
-                <div className="flex flex-col items-center justify-center px-2">
-                  <div className="w-full flex justify-between text-[11px] text-slate-400 font-medium mb-1.5">
-                    <span>In Transit</span>
-                    <span className="text-amber-400 font-bold">{activeConsignment.progressPercentage}%</span>
-                  </div>
-                  <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5">
-                    <div
-                      className="h-full bg-gradient-to-r from-amber-500 to-amber-300 rounded-full transition-all duration-700"
-                      style={{ width: `${activeConsignment.progressPercentage}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-1.5">
-                    <Clock className="w-3 h-3 text-amber-400" />
-                    <span>ETA: {activeConsignment.estimatedDelivery}</span>
-                  </div>
-                </div>
+                {(() => {
+                  const statusMeta = getStatusProgressAndColor(activeConsignment.status);
+                  const progressVal = statusMeta.progress;
+                  const is100 = progressVal >= 100;
+                  const isZero = progressVal === 0;
+
+                  return (
+                    <div className="flex flex-col items-center justify-center px-2">
+                      <div className="w-full flex justify-between text-[11px] text-slate-400 font-medium mb-1.5">
+                        <span className="font-semibold text-slate-200">{statusMeta.label}</span>
+                        <span className={`font-bold font-mono ${is100 ? 'text-emerald-400' : isZero ? 'text-rose-400' : 'text-amber-400'}`}>
+                          {progressVal}%
+                        </span>
+                      </div>
+                      <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5">
+                        <div
+                          className={`h-full rounded-full transition-all duration-700 ${
+                            is100
+                              ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                              : isZero
+                              ? 'bg-rose-500'
+                              : 'bg-gradient-to-r from-amber-500 to-amber-300'
+                          }`}
+                          style={{ width: `${progressVal}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-1.5">
+                        <Clock className="w-3 h-3 text-amber-400" />
+                        <span>ETA: {activeConsignment.estimatedDelivery || 'Calculated in Real-Time'}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Destination */}
                 <div className="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800">
@@ -297,23 +305,21 @@ export const TrackingModal: React.FC = () => {
             <div className="flex border-b border-slate-800 gap-4 text-xs font-semibold">
               <button
                 onClick={() => setActiveTab('timeline')}
-                className={`pb-2.5 transition flex items-center gap-1.5 border-b-2 ${
-                  activeTab === 'timeline'
+                className={`pb-2.5 transition flex items-center gap-1.5 border-b-2 ${activeTab === 'timeline'
                     ? 'border-amber-400 text-amber-400'
                     : 'border-transparent text-slate-400 hover:text-slate-200'
-                }`}
+                  }`}
               >
                 <Clock className="w-4 h-4" />
-                <span>Tracking Milestones ({activeConsignment.timeline.length})</span>
+                <span>Tracking Milestones ({activeTimeline.length})</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('details')}
-                className={`pb-2.5 transition flex items-center gap-1.5 border-b-2 ${
-                  activeTab === 'details'
+                className={`pb-2.5 transition flex items-center gap-1.5 border-b-2 ${activeTab === 'details'
                     ? 'border-amber-400 text-amber-400'
                     : 'border-transparent text-slate-400 hover:text-slate-200'
-                }`}
+                  }`}
               >
                 <Package className="w-4 h-4" />
                 <span>Cargo & Consignee Details</span>
@@ -321,11 +327,10 @@ export const TrackingModal: React.FC = () => {
 
               <button
                 onClick={() => setActiveTab('customs')}
-                className={`pb-2.5 transition flex items-center gap-1.5 border-b-2 ${
-                  activeTab === 'customs'
+                className={`pb-2.5 transition flex items-center gap-1.5 border-b-2 ${activeTab === 'customs'
                     ? 'border-amber-400 text-amber-400'
                     : 'border-transparent text-slate-400 hover:text-slate-200'
-                }`}
+                  }`}
               >
                 <ShieldCheck className="w-4 h-4" />
                 <span>Customs & Regulatory (Act 2023)</span>
@@ -335,21 +340,20 @@ export const TrackingModal: React.FC = () => {
             {/* Tab 1: Timeline Milestones */}
             {activeTab === 'timeline' && (
               <div className="relative pl-6 space-y-6 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800">
-                {activeConsignment.timeline.map((step, idx) => {
-                  const isDone = step.status === 'completed';
-                  const isCurrent = step.status === 'current';
+                {activeTimeline.map((step, idx) => {
+                  const isDone = step.isDone;
+                  const isCurrent = step.isCurrent;
 
                   return (
                     <div key={step.id || idx} className="relative group">
                       {/* Milestone marker */}
                       <div
-                        className={`absolute -left-6 top-1 w-6 h-6 rounded-full flex items-center justify-center text-xs transition ${
-                          isDone
+                        className={`absolute -left-6 top-1 w-6 h-6 rounded-full flex items-center justify-center text-xs transition ${isDone
                             ? 'bg-emerald-500 text-slate-950 font-bold ring-4 ring-slate-900'
                             : isCurrent
-                            ? 'bg-amber-400 text-slate-950 font-bold ring-4 ring-amber-500/25 animate-pulse'
-                            : 'bg-slate-800 text-slate-500 ring-4 ring-slate-900'
-                        }`}
+                              ? 'bg-amber-400 text-slate-950 font-bold ring-4 ring-amber-500/25 animate-pulse'
+                              : 'bg-slate-800 text-slate-500 ring-4 ring-slate-900'
+                          }`}
                       >
                         {isDone ? (
                           <CheckCircle2 className="w-4 h-4" />
@@ -361,13 +365,12 @@ export const TrackingModal: React.FC = () => {
                       </div>
 
                       <div
-                        className={`p-4 rounded-xl border transition ${
-                          isCurrent
+                        className={`p-4 rounded-xl border transition ${isCurrent
                             ? 'bg-amber-500/5 border-amber-500/30 shadow-md'
                             : isDone
-                            ? 'bg-slate-900/60 border-slate-800'
-                            : 'bg-slate-900/30 border-slate-800/50 opacity-60'
-                        }`}
+                              ? 'bg-slate-900/60 border-slate-800'
+                              : 'bg-slate-900/30 border-slate-800/50 opacity-60'
+                          }`}
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <h4 className="font-bold text-sm text-slate-100 flex items-center gap-2">
@@ -597,6 +600,12 @@ export const TrackingModal: React.FC = () => {
                 </a>
               </div>
             </div>
+          </div>
+        ) : (
+          <div className="p-12 text-center text-slate-400">
+            <Package className="w-12 h-12 mx-auto mb-3 text-slate-600 opacity-60" />
+            <h3 className="text-base font-semibold text-slate-200">No consignment selected</h3>
+            <p className="text-xs text-slate-400 mt-1">Enter your Consignment No. above to view real-time tracking details.</p>
           </div>
         )}
       </div>
