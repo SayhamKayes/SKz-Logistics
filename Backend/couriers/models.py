@@ -5,34 +5,34 @@ class Consignment(models.Model):
     reference_no = models.CharField(max_length=64, blank=True, null=True)
     status = models.CharField(max_length=64, default='At Bangladesh warehouse', blank=True)
     service_type = models.CharField(max_length=64, default='Air Freight Priority', blank=True)
-    carrier = models.CharField(max_length=128, default='SAIN Direct Freight Network')
+    carrier = models.CharField(max_length=128, default='SAIN Direct Freight Network', blank=True)
     awb_number = models.CharField(max_length=64, blank=True, null=True)
 
     # Corridor
-    origin_city = models.CharField(max_length=128, default='Guangzhou')
-    origin_hub = models.CharField(max_length=255, default='SAIN Guangzhou Terminal, Baiyun')
-    origin_country = models.CharField(max_length=64, default='China')
-    origin_code = models.CharField(max_length=10, default='CAN')
+    origin_city = models.CharField(max_length=128, default='Guangzhou', blank=True)
+    origin_hub = models.CharField(max_length=255, default='SAIN Guangzhou Terminal, Baiyun', blank=True)
+    origin_country = models.CharField(max_length=64, default='China', blank=True)
+    origin_code = models.CharField(max_length=10, default='CAN', blank=True)
 
-    destination_city = models.CharField(max_length=128, default='Dhaka')
-    destination_address = models.CharField(max_length=255, default='Sector 3, Uttara, Dhaka-1230')
-    destination_country = models.CharField(max_length=64, default='Bangladesh')
-    destination_code = models.CharField(max_length=10, default='DAC')
+    destination_city = models.CharField(max_length=128, default='Dhaka', blank=True)
+    destination_address = models.CharField(max_length=255, default='Sector 3, Uttara, Dhaka-1230', blank=True)
+    destination_country = models.CharField(max_length=64, default='Bangladesh', blank=True)
+    destination_code = models.CharField(max_length=10, default='DAC', blank=True)
 
     # Cargo Specs
     pieces = models.PositiveIntegerField(default=1)
     weight_kg = models.DecimalField(max_digits=10, decimal_places=2, default=25.0)
-    dimensions = models.CharField(max_length=128, default='Standard Export Packaging')
+    dimensions = models.CharField(max_length=128, default='Standard Export Packaging', blank=True)
     volume_cbm = models.DecimalField(max_digits=10, decimal_places=3, blank=True, null=True)
-    cargo_description = models.TextField(default='Commercial Freight Goods')
+    cargo_description = models.TextField(default='Commercial Freight Goods', blank=True)
     hs_code = models.CharField(max_length=32, blank=True, null=True)
 
     # Customs Act 2023 Compliance
-    customs_act = models.CharField(max_length=128, default='Bangladesh Customs Act 2023 Compliant')
-    trade_term = models.CharField(max_length=32, default='CFR Dhaka')
+    customs_act = models.CharField(max_length=128, default='Bangladesh Customs Act 2023 Compliant', blank=True)
+    trade_term = models.CharField(max_length=32, default='CFR Dhaka', blank=True)
     duty_cleared = models.BooleanField(default=False)
-    duty_status = models.CharField(max_length=128, default='Duty Assessed & Cleared')
-    assessment_station = models.CharField(max_length=255, default='Hazrat Shahjalal International Airport Customs House')
+    duty_status = models.CharField(max_length=128, default='Duty Assessed & Cleared', blank=True)
+    assessment_station = models.CharField(max_length=255, default='Hazrat Shahjalal International Airport Customs House', blank=True)
 
     # Shipper Details
     shipper_name = models.CharField(max_length=255, default='SAIN', blank=True)
@@ -73,11 +73,11 @@ class Consignment(models.Model):
     published_status = models.CharField(max_length=64, default='Published', blank=True)
 
     # Consignee
-    consignee_name = models.CharField(max_length=128, default='Muhammad Tahin')
-    consignee_phone = models.CharField(max_length=32, default='+8801731939325')
+    consignee_name = models.CharField(max_length=128, default='Muhammad Tahin', blank=True)
+    consignee_phone = models.CharField(max_length=32, default='+8801731939325', blank=True)
 
     progress_percentage = models.PositiveIntegerField(default=20)
-    estimated_delivery = models.CharField(max_length=128, default='Within 48 hours')
+    estimated_delivery = models.CharField(max_length=128, default='Within 48 hours', blank=True)
     departure_date = models.DateTimeField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
