@@ -180,7 +180,7 @@ export const TrackingSection: React.FC = () => {
                       setInputVal(e.target.value);
                       if (errorText) setErrorText('');
                     }}
-                    placeholder="Enter the Consignment No. Ex: 12345"
+                    placeholder="Enter Consignment No. Ex: SAINEX067638406"
                     className="w-full bg-slate-50 border-2 border-slate-200 hover:border-slate-300 focus:border-[#1a6c7a] focus:bg-white focus:ring-4 focus:ring-teal-500/10 rounded-2xl px-5 py-4 pl-12 text-slate-900 placeholder-slate-400 text-base sm:text-lg focus:outline-none transition font-mono shadow-inner"
                   />
                   <Search className="w-5 h-5 text-[#1a6c7a] absolute left-4.5 top-4.5" />
@@ -211,22 +211,8 @@ export const TrackingSection: React.FC = () => {
                 </p>
               )}
 
-              {/* Quick click suggestions */}
-              <div className="pt-2 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-slate-600 font-medium">Quick Examples:</span>
-                  {['12345', 'SAIN-78492-BD', 'SAIN-SEA-99120'].map((code) => (
-                    <button
-                      key={code}
-                      type="button"
-                      onClick={() => handleQuickClick(code)}
-                      className="px-2.5 py-1 bg-slate-100 hover:bg-teal-50 hover:text-[#1a6c7a] border border-slate-200 hover:border-teal-300 rounded-lg font-mono text-[11px] transition cursor-pointer text-slate-700"
-                    >
-                      {code}
-                    </button>
-                  ))}
-                </div>
-
+              {/* Compliance Badge without demo quick examples */}
+              <div className="pt-1 flex items-center justify-end text-xs text-slate-500">
                 <div className="flex items-center gap-1.5 text-slate-500 text-[11px]">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Compliant with Bangladesh Customs Act 2023</span>
@@ -234,53 +220,90 @@ export const TrackingSection: React.FC = () => {
               </div>
             </form>
 
-            {/* Active Preloaded Consignments Highlights */}
+            {/* Active Consignments Highlights */}
             <div className="mt-6 pt-6 border-t border-slate-200/80 relative z-10">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center justify-between">
-                <span>Recently Updated Freight Shipments</span>
-                <span className="text-[11px] text-amber-600 font-normal">Click any card to inspect full waypoint log</span>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
+                Recently Updated Freight Shipments
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {Object.values(allConsignments).slice(0, 3).map((item) => (
+              {(() => {
+                let trashed: Record<string, any> = {};
+                try {
+                  trashed = JSON.parse(localStorage.getItem('sain_trashed_consignments') || '{}');
+                } catch {}
+
+                const recentList = Object.values(allConsignments)
+                  .filter((c) => c && c.consignmentNo && !['12345', 'SAIN-78492-BD', 'SAIN-SEA-99120', 'SAIN-HC-5501'].includes(c.consignmentNo))
+                  .filter((c) => !trashed[c.consignmentNo])
+                  .slice(0, 3);
+
+                if (recentList.length === 0) {
+                  return (
+                    <div className="py-6 px-4 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
+                      <p className="text-xs text-slate-500 font-medium">
+                        No recent freight shipments currently registered. Track using your Consignment No. above.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
                   <div
-                    key={item.consignmentNo}
-                    onClick={() => handleQuickClick(item.consignmentNo)}
-                    className="bg-slate-50 hover:bg-white border border-slate-200 hover:border-[#1a6c7a] p-3.5 rounded-2xl transition cursor-pointer group shadow-xs hover:shadow-md"
+                    className={`grid gap-3 ${
+                      recentList.length === 1
+                        ? 'grid-cols-1 max-w-sm'
+                        : recentList.length === 2
+                          ? 'grid-cols-1 sm:grid-cols-2 max-w-2xl'
+                          : 'grid-cols-1 md:grid-cols-3'
+                    }`}
                   >
-                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/80">
-                      <span className="font-mono font-bold text-[#153243] text-sm group-hover:text-[#1a6c7a] transition">
-                        {item.consignmentNo}
-                      </span>
-                      <span
-                        className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                          item.status === 'Delivered'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : item.status === 'Out for Delivery'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-blue-100 text-blue-800'
-                        }`}
+                    {recentList.map((item) => (
+                      <div
+                        key={item.consignmentNo}
+                        onClick={() => handleQuickClick(item.consignmentNo)}
+                        className="bg-slate-50 hover:bg-white border border-slate-200 hover:border-[#1a6c7a] p-3.5 rounded-2xl transition cursor-pointer group shadow-xs hover:shadow-md"
                       >
-                        {item.status}
-                      </span>
-                    </div>
+                        <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/80">
+                          <span className="font-mono font-bold text-[#153243] text-sm group-hover:text-[#1a6c7a] transition">
+                            {item.consignmentNo}
+                          </span>
+                          <span
+                            className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                              item.status === 'Delivered'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : item.status?.toLowerCase().includes('out for delivery')
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : item.status === 'On Hold by Customs'
+                                    ? 'bg-orange-100 text-orange-800'
+                                    : item.status === 'At Bangladesh warehouse'
+                                      ? 'bg-teal-100 text-teal-800'
+                                      : item.status === 'Cancelled' || item.status === 'Returned'
+                                        ? 'bg-rose-100 text-rose-800'
+                                        : 'bg-blue-100 text-blue-800'
+                            }`}
+                          >
+                            {item.status}
+                          </span>
+                        </div>
 
-                    <div className="flex items-center justify-between text-xs text-slate-700 mb-2">
-                      <div className="font-semibold">{item.origin.city}</div>
-                      <ArrowRight className="w-3 h-3 text-slate-400" />
-                      <div className="font-semibold text-emerald-700">{item.destination.city}</div>
-                    </div>
+                        <div className="flex items-center justify-between text-xs text-slate-700 mb-2">
+                          <div className="font-semibold">{item.origin?.city || 'Origin'}</div>
+                          <ArrowRight className="w-3 h-3 text-slate-400" />
+                          <div className="font-semibold text-emerald-700">{item.destination?.city || 'Bangladesh'}</div>
+                        </div>
 
-                    <div className="flex items-center justify-between text-[11px] text-slate-500">
-                      <span>{item.cargoDetails.weight}</span>
-                      <span className="text-[#1a6c7a] font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
-                        <span>View</span>
-                        <ChevronRight className="w-3 h-3" />
-                      </span>
-                    </div>
+                        <div className="flex items-center justify-between text-[11px] text-slate-500">
+                          <span>{item.cargoDetails?.weight || 'Verified Cargo'}</span>
+                          <span className="text-[#1a6c7a] font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                            <span>View</span>
+                            <ChevronRight className="w-3 h-3" />
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                );
+              })()}
             </div>
           </div>
         </div>
