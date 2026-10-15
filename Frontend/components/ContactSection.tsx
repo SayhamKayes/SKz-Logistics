@@ -128,7 +128,7 @@ export const ContactSection: React.FC = () => {
                   <span>Base in Sector 3, Uttara, Dhaka-1230, Bangladesh</span>
                 </div>
                 <div className="pt-2 border-t border-slate-100 flex justify-between text-slate-700">
-                  <span>Saturday — Thursday:</span>
+                  <span>Saturday - Thursday:</span>
                   <strong className="text-emerald-700 font-mono font-bold">10:00 AM – 9:00 PM</strong>
                 </div>
                 <div className="flex justify-between text-slate-500">
@@ -241,7 +241,7 @@ export const ContactSection: React.FC = () => {
                     type="text"
                     value={formData.consignmentNo}
                     onChange={(e) => setFormData({ ...formData, consignmentNo: e.target.value })}
-                    placeholder="e.g. 12345 or SAIN-78492-BD"
+                    placeholder="e.g. SAINEX067638406"
                     className="w-full bg-slate-50 border-2 border-slate-200 hover:border-slate-300 focus:border-[#153243] focus:bg-white focus:ring-4 focus:ring-amber-500/10 rounded-2xl px-4 py-3 text-sm text-[#0f172a] placeholder-slate-400 focus:outline-none transition font-mono"
                   />
                 </div>
