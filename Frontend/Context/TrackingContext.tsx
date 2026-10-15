@@ -6,6 +6,7 @@ import {
   buildConsignmentTimeline,
   normalizeStatus,
 } from '../services/trackingData';
+import { API_BASE_URL } from '../services/databaseConfig';
 
 export type AppTab = 'home' | 'about' | 'services' | 'contact' | 'track' | 'admin';
 
@@ -137,7 +138,7 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     const fetchBackendConsignments = async () => {
       try {
-        const res = await fetch('http://127.0.0.1:8000/api/v1/couriers/consignments/', {
+        const res = await fetch(`${API_BASE_URL}/api/v1/couriers/consignments/`, {
           headers: { Accept: 'application/json' },
         });
         if (res.ok) {
@@ -334,7 +335,7 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     // 1. Try Live Django REST Framework API First
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/v1/couriers/track/${encodeURIComponent(clean)}/`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/couriers/track/${encodeURIComponent(clean)}/`, {
         headers: { 'Accept': 'application/json' },
       });
 
@@ -474,7 +475,7 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         })) || [],
       };
 
-      const res = await fetch('http://127.0.0.1:8000/api/v1/couriers/consignments/', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/couriers/consignments/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify(payload),
@@ -538,7 +539,7 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     try {
-      await fetch(`http://127.0.0.1:8000/api/v1/couriers/track/${encodeURIComponent(consignmentNo)}/`, {
+      await fetch(`${API_BASE_URL}/api/v1/couriers/track/${encodeURIComponent(consignmentNo)}/`, {
         method: 'DELETE',
       });
     } catch (e) {

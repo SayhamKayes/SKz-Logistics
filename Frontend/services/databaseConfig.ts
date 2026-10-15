@@ -44,11 +44,17 @@ export const DEFAULT_DB_CONFIG: DatabaseConnectionConfig = {
     user: 'sain_user',
   },
   djangoApi: {
-    baseUrl: 'http://127.0.0.1:8000',
+    baseUrl: 'https://skzlogisticsbackend.onrender.com',
     trackingEndpoint: '/api/v1/couriers/track/',
     ordersEndpoint: '/api/v1/order/',
   },
 };
+
+export const API_BASE_URL =
+  (import.meta as any).env?.VITE_API_BASE_URL ||
+  (typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    ? 'http://127.0.0.1:8000'
+    : 'https://skzlogisticsbackend.onrender.com');
 
 export const DB_STORAGE_KEY = 'sain_db_provider_config';
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTracking } from '../Context/TrackingContext';
+import { API_BASE_URL } from '../services/databaseConfig';
 import { AdminLogin } from '../components/admin/AdminLogin';
 import { AdminSidebar, AdminSection } from '../components/admin/AdminSidebar';
 import { ShipmentManager } from '../components/admin/ShipmentManager';
@@ -62,7 +63,7 @@ export const AdminPage: React.FC = () => {
     let isMounted = true;
     const checkBackend = async () => {
       try {
-        const res = await fetch('http://127.0.0.1:8000/api/v1/couriers/track/SAINEX067638406/');
+        const res = await fetch(`${API_BASE_URL}/api/v1/couriers/track/SAINEX067638406/`);
         if (isMounted) {
           if (res.ok) {
             setServerStatus('online');
