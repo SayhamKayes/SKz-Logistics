@@ -32,7 +32,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 }) => {
   const menuItems: { id: AdminSection; label: string; icon: any; badge?: string }[] = [
     { id: 'shipments', label: 'Shipment Manager', icon: Package, badge: 'Live DRF' },
-    { id: 'home', label: 'Home Page Content', icon: Home },
+    { id: 'home', label: 'Hero Section', icon: Home, badge: 'Banner' },
     { id: 'about', label: 'About Us Section', icon: Info },
     { id: 'services', label: 'Services Catalog', icon: Truck },
     { id: 'contact', label: 'Contact & Branches', icon: Phone },
