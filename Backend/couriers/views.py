@@ -79,7 +79,7 @@ class ConsignmentListCreateView(APIView):
         if existing:
             serializer = ConsignmentSerializer(existing, data=request.data, partial=True)
         else:
-            serializer = ConsignmentSerializer(data=request.data)
+            serializer = ConsignmentSerializer(data=request.data, partial=True)
 
         if serializer.is_valid():
             saved_consignment = serializer.save()
