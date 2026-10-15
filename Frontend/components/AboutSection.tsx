@@ -29,7 +29,7 @@ export const AboutSection: React.FC = () => {
             About <span className="text-amber-500">SAIN Ship</span>
           </h2>
           <p className="text-slate-600 text-base sm:text-lg leading-relaxed">
-            <strong>SAIN ship</strong> is a trusted shipping and courier company dedicated to connecting people and businesses with fast, secure, and reliable delivery services. Our mission is to simplify the shipping process while providing exceptional customer service.
+            <strong>SAIN</strong> is a trusted shipping and courier company dedicated to connecting people and businesses with fast, secure, and reliable delivery services. Our mission is to simplify the shipping process while providing exceptional customer service.
           </p>
         </div>
 
@@ -122,13 +122,6 @@ export const AboutSection: React.FC = () => {
               Start shipping with us today and experience convenience at every step! Transparent rates, zero hidden surcharges, and direct doorstep delivery across Bangladesh.
             </p>
             <div className="pt-2 flex flex-wrap items-center gap-4">
-              <button
-                onClick={() => openQuoteModal()}
-                className="px-6 py-3.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-amber-500/25 transition flex items-center gap-2 cursor-pointer active:scale-95"
-              >
-                <span>Request Quotation</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
               <button
                 onClick={() => openTrackingModal()}
                 className="px-6 py-3.5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase tracking-wider rounded-xl border border-white/20 transition flex items-center gap-2 cursor-pointer"
