@@ -180,7 +180,7 @@ export const AdminPage: React.FC = () => {
                   {currentSection === 'shipments'
                     ? 'Consignment Manager'
                     : currentSection === 'home'
-                      ? 'Home Content'
+                      ? 'Hero Section'
                       : currentSection === 'about'
                         ? 'About Us Content'
                         : currentSection === 'services'
