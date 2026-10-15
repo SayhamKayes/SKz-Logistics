@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTracking } from '../../Context/TrackingContext';
-import { Consignment, PackageItem, ShipmentHistoryItem, getStatusProgressAndColor } from '../../services/trackingData';
+import { Consignment, PackageItem, ShipmentHistoryItem, getStatusProgressAndColor, buildConsignmentTimeline, normalizeStatus, getBangladeshDateTime } from '../../services/trackingData';
 import { WaybillPrintModal } from './WaybillPrintModal';
 import {
   Package,
@@ -18,6 +18,7 @@ import {
   Tag,
   FolderPlus,
   AlertTriangle,
+  X,
 } from 'lucide-react';
 
 const DEFAULT_ORIGINS = ['China', 'Hong Kong', 'Singapore', 'Bangladesh', 'Thailand', 'Vietnam'];
@@ -31,13 +32,35 @@ const DEFAULT_AGENTS = [
   'Chittagong Seaport Logistics Agent (CTG)',
   'Uttara Metro Operations Desk',
 ];
+const DEFAULT_CLIENTS = [
+  '-- Select Client --',
+  'Muhammad Tahin (VIP)',
+  'Bengal Import Trading Ltd',
+  'Sylhet Garments Export',
+];
+const DEFAULT_EMPLOYEES = [
+  '-- Select Employee --',
+  'SAIN Admin (sain_sakib6055)',
+  'Customs Officer (HSIA Airport)',
+  'Warehouse Manager (Uttara Hub)',
+];
+
+export interface StatusToastData {
+  consignmentNo: string;
+  status: string;
+  location: string;
+  time: string;
+  date: string;
+  remarks?: string;
+}
 
 export const ShipmentManager: React.FC = () => {
-  const { allConsignments, updateConsignment, addConsignment, openTrackingModal } = useTracking();
+  const { allConsignments, updateConsignment, addConsignment, deleteConsignment, openTrackingModal } = useTracking();
 
   // Selected consignment number for editing
   const [selectedNo, setSelectedNo] = useState<string>('SAINEX067638406');
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const [statusToast, setStatusToast] = useState<StatusToastData | null>(null);
   const [isWaybillOpen, setIsWaybillOpen] = useState(false);
 
   // View Filter: Active vs Trash
@@ -59,7 +82,7 @@ export const ShipmentManager: React.FC = () => {
     try {
       const stored = localStorage.getItem('sain_custom_origins');
       if (stored) return JSON.parse(stored);
-    } catch {}
+    } catch { }
     return DEFAULT_ORIGINS;
   });
 
@@ -67,7 +90,7 @@ export const ShipmentManager: React.FC = () => {
     try {
       const stored = localStorage.getItem('sain_custom_destinations');
       if (stored) return JSON.parse(stored);
-    } catch {}
+    } catch { }
     return DEFAULT_DESTINATIONS;
   });
 
@@ -75,8 +98,24 @@ export const ShipmentManager: React.FC = () => {
     try {
       const stored = localStorage.getItem('sain_custom_agents');
       if (stored) return JSON.parse(stored);
-    } catch {}
+    } catch { }
     return DEFAULT_AGENTS;
+  });
+
+  const [clients, setClients] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('sain_custom_clients');
+      if (stored) return JSON.parse(stored);
+    } catch { }
+    return DEFAULT_CLIENTS;
+  });
+
+  const [employees, setEmployees] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('sain_custom_employees');
+      if (stored) return JSON.parse(stored);
+    } catch { }
+    return DEFAULT_EMPLOYEES;
   });
 
   // Inline Add Input States
@@ -89,21 +128,37 @@ export const ShipmentManager: React.FC = () => {
   const [showAddAgent, setShowAddAgent] = useState(false);
   const [newAgentInput, setNewAgentInput] = useState('');
 
+  const [showAddClient, setShowAddClient] = useState(false);
+  const [newClientInput, setNewClientInput] = useState('');
+
+  const [showAddEmployee, setShowAddEmployee] = useState(false);
+  const [newEmployeeInput, setNewEmployeeInput] = useState('');
+
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState('');
 
-  // Active consignment object (filtered from non-trashed)
+  // Active consignment object (filtered from non-trashed and excluding demo consignments)
+  const DEMO_KEYS = useMemo(() => new Set(['12345', 'SAIN-78492-BD', 'SAIN-SEA-99120', 'SAIN-HC-5501']), []);
+
   const activeConsignmentsList = useMemo(() => {
     const list: Record<string, Consignment> = {};
     Object.entries(allConsignments).forEach(([k, v]) => {
-      if (!trashedConsignments[k]) {
+      if (!trashedConsignments[k] && !DEMO_KEYS.has(k)) {
         list[k] = v;
       }
     });
     return list;
-  }, [allConsignments, trashedConsignments]);
+  }, [allConsignments, trashedConsignments, DEMO_KEYS]);
 
   const currentConsignment = activeConsignmentsList[selectedNo] || Object.values(activeConsignmentsList)[0];
+
+  useEffect(() => {
+    if (activeConsignmentsList && Object.keys(activeConsignmentsList).length > 0) {
+      if (!activeConsignmentsList[selectedNo]) {
+        setSelectedNo(Object.keys(activeConsignmentsList)[0]);
+      }
+    }
+  }, [activeConsignmentsList, selectedNo]);
 
   // ==========================================
   // Form State initialized from current consignment
@@ -195,11 +250,12 @@ export const ShipmentManager: React.FC = () => {
   const [client, setClient] = useState('-- Select Client --');
   const [selectedAgent, setSelectedAgent] = useState('Guangzhou Hub Receiving Agent (CAN)');
   const [employee, setEmployee] = useState('-- Select Employee --');
-  const [publishedOn, setPublishedOn] = useState('Aug 11, 2026 at 13:39');
-  const [publishDate, setPublishDate] = useState('2026-10-10');
-  const [publishTime, setPublishTime] = useState('18:52 pm');
-  const [publishLocation, setPublishLocation] = useState('Dhaka Airport Hub');
-  const [publishCurrentStatus, setPublishCurrentStatus] = useState('At Bangladesh warehouse');
+  const bdInit = getBangladeshDateTime();
+  const [publishedOn, setPublishedOn] = useState(currentConsignment?.adminMetadata?.publishedOn || bdInit.formatted);
+  const [publishDate, setPublishDate] = useState(bdInit.date);
+  const [publishTime, setPublishTime] = useState(bdInit.time);
+  const [publishLocation, setPublishLocation] = useState('Guangzhou Hub, China');
+  const [publishCurrentStatus, setPublishCurrentStatus] = useState(currentConsignment?.status || 'Pending');
   const [publishRemarks, setPublishRemarks] = useState('');
   const [tags, setTags] = useState<string[]>(['Guangzhou', 'Air Express']);
   const [tagInput, setTagInput] = useState('');
@@ -207,6 +263,22 @@ export const ShipmentManager: React.FC = () => {
     'Keychain Mix': true,
     'Electronic Item': false,
   });
+
+  const handleStatusSelectChange = (newStatus: string) => {
+    setPublishCurrentStatus(newStatus);
+    const bdNow = getBangladeshDateTime();
+    setPublishDate(bdNow.date);
+    setPublishTime(bdNow.time);
+
+    const s = newStatus.toLowerCase();
+    if (s.includes('pending')) setPublishLocation('China Cargo Terminal');
+    else if (s.includes('received')) setPublishLocation('Guangzhou Hub, China');
+    else if (s.includes('transit') || s.includes('route')) setPublishLocation('CAN → DAC Flight Transit');
+    else if (s.includes('customs') || s.includes('hold')) setPublishLocation('Dhaka Airport Customs');
+    else if (s.includes('warehouse')) setPublishLocation('SAIN Bangladesh Warehouse');
+    else if (s.includes('out for delivery')) setPublishLocation('Dhaka Metro Hub');
+    else if (s.includes('delivered')) setPublishLocation('Consignee Doorstep, Dhaka');
+  };
 
   // Sync state when active selection changes
   useEffect(() => {
@@ -258,8 +330,26 @@ export const ShipmentManager: React.FC = () => {
     if (currentConsignment.status) {
       setPublishCurrentStatus(currentConsignment.status);
     }
+    const bdNow = getBangladeshDateTime();
+    setPublishDate(bdNow.date);
+    setPublishTime(bdNow.time);
     if (currentConsignment.adminMetadata?.publishedOn) {
       setPublishedOn(currentConsignment.adminMetadata.publishedOn);
+    } else {
+      setPublishedOn(bdNow.formatted);
+    }
+    if (currentConsignment.adminMetadata?.client) {
+      setClient(currentConsignment.adminMetadata.client);
+    } else {
+      setClient('-- Select Client --');
+    }
+    if (currentConsignment.adminMetadata?.agentName) {
+      setSelectedAgent(currentConsignment.adminMetadata.agentName);
+    }
+    if (currentConsignment.adminMetadata?.employee) {
+      setEmployee(currentConsignment.adminMetadata.employee);
+    } else {
+      setEmployee('-- Select Employee --');
     }
   }, [selectedNo, currentConsignment]);
 
@@ -414,6 +504,46 @@ export const ShipmentManager: React.FC = () => {
     }
   };
 
+  const handleAddCustomClient = (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = newClientInput.trim();
+    if (val && !clients.includes(val)) {
+      const updated = [...clients, val];
+      setClients(updated);
+      setClient(val);
+      localStorage.setItem('sain_custom_clients', JSON.stringify(updated));
+      setNewClientInput('');
+      setShowAddClient(false);
+    }
+  };
+
+  const handleRemoveClient = (clientToRemove: string) => {
+    const updated = clients.filter((c) => c !== clientToRemove);
+    setClients(updated);
+    if (client === clientToRemove) setClient(updated[0] || '-- Select Client --');
+    localStorage.setItem('sain_custom_clients', JSON.stringify(updated));
+  };
+
+  const handleAddCustomEmployee = (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = newEmployeeInput.trim();
+    if (val && !employees.includes(val)) {
+      const updated = [...employees, val];
+      setEmployees(updated);
+      setEmployee(val);
+      localStorage.setItem('sain_custom_employees', JSON.stringify(updated));
+      setNewEmployeeInput('');
+      setShowAddEmployee(false);
+    }
+  };
+
+  const handleRemoveEmployee = (empToRemove: string) => {
+    const updated = employees.filter((emp) => emp !== empToRemove);
+    setEmployees(updated);
+    if (employee === empToRemove) setEmployee(updated[0] || '-- Select Employee --');
+    localStorage.setItem('sain_custom_employees', JSON.stringify(updated));
+  };
+
   const handleRemoveDestination = (destToRemove: string) => {
     if (destinations.length <= 1) return;
     const updated = destinations.filter((d) => d !== destToRemove);
@@ -431,10 +561,9 @@ export const ShipmentManager: React.FC = () => {
   };
 
   const handleRemoveAgent = (agentToRemove: string) => {
-    if (agents.length <= 1) return;
     const updated = agents.filter((a) => a !== agentToRemove);
     setAgents(updated);
-    if (selectedAgent === agentToRemove) setSelectedAgent(updated[0]);
+    if (selectedAgent === agentToRemove) setSelectedAgent(updated[0] || '-- Select Agent --');
     localStorage.setItem('sain_custom_agents', JSON.stringify(updated));
   };
 
@@ -456,9 +585,10 @@ export const ShipmentManager: React.FC = () => {
       counter++;
     } while ((allConsignments[newBillNo] || trashedConsignments[newBillNo]) && counter < 50);
 
-    const todayDate = new Date().toISOString().split('T')[0];
-    const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const nowFormatted = `${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at ${currentTime}`;
+    const bdNow = getBangladeshDateTime();
+    const todayDate = bdNow.date;
+    const currentTime = bdNow.time;
+    const nowFormatted = bdNow.formatted;
 
     const newTemplateConsignment: Consignment = {
       consignmentNo: newBillNo,
@@ -625,12 +755,17 @@ export const ShipmentManager: React.FC = () => {
     setTimeout(() => setSaveSuccessMsg(null), 3500);
   };
 
-  const handleDeletePermanently = (noToDelete: string) => {
+  const handleDeletePermanently = async (noToDelete: string) => {
     if (window.confirm(`Permanently delete ${noToDelete}? This action cannot be undone.`)) {
       const copy = { ...trashedConsignments };
       delete copy[noToDelete];
       setTrashedConsignments(copy);
       localStorage.setItem('sain_trashed_consignments', JSON.stringify(copy));
+      try {
+        await deleteConsignment(noToDelete);
+      } catch (e) {
+        console.warn('Failed to delete from database:', e);
+      }
       setSaveSuccessMsg(`Consignment ${noToDelete} permanently deleted.`);
       setTimeout(() => setSaveSuccessMsg(null), 3000);
     }
@@ -640,22 +775,43 @@ export const ShipmentManager: React.FC = () => {
   // SAVE / UPDATE SHIPMENT (Sync with Django and Frontend Context)
   // ==========================================================
   const handleSaveShipment = async () => {
-    const now = new Date();
-    const formattedNow = `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-    setPublishedOn(formattedNow);
+    const bdNow = getBangladeshDateTime();
+    const effectiveDate = publishDate || bdNow.date;
+    const effectiveTime = publishTime || bdNow.time;
+    setPublishedOn(bdNow.formatted);
 
-    const liveStatus = (publishCurrentStatus as any) || 'At Bangladesh warehouse';
+    const liveStatus = normalizeStatus((publishCurrentStatus as any) || currentConsignment?.status || 'At Bangladesh warehouse');
     const { progress, color } = getStatusProgressAndColor(liveStatus);
 
-    // Build timeline in real-time from the shipment history checkpoints
-    const liveTimeline = shipmentHistory.map((sh, idx) => ({
-      id: `t-${sh.id || idx}`,
-      timestamp: `${sh.date} • ${sh.time}`,
-      location: sh.location,
-      title: sh.status,
-      description: sh.remarks || `Status updated to ${sh.status} by ${sh.updatedBy}`,
-      status: (sh.status.toLowerCase().includes('delivered') ? 'completed' : idx === 0 ? 'current' : 'completed') as any,
-    }));
+    // Record status checkpoint into shipment history
+    let updatedHistory = [...shipmentHistory];
+    const topEntry = updatedHistory[0];
+
+    if (topEntry && normalizeStatus(topEntry.status).toLowerCase() === liveStatus.toLowerCase() && topEntry.date === effectiveDate) {
+      updatedHistory[0] = {
+        ...topEntry,
+        date: effectiveDate,
+        time: effectiveTime,
+        location: publishLocation || topEntry.location,
+        remarks: publishRemarks || topEntry.remarks,
+        updatedBy: 'SAIN International Logistics',
+      };
+    } else {
+      const newCheckpoint: ShipmentHistoryItem = {
+        id: `h-${Date.now()}`,
+        date: effectiveDate,
+        time: effectiveTime,
+        location: publishLocation || (liveStatus.toLowerCase().includes('bangladesh') ? 'Dhaka Airport Hub' : 'Guangzhou Hub'),
+        status: liveStatus,
+        remarks: publishRemarks || `Status updated to ${liveStatus} by SAIN Logistics`,
+        updatedBy: 'SAIN International Logistics',
+      };
+      updatedHistory = [newCheckpoint, ...updatedHistory];
+    }
+    setShipmentHistory(updatedHistory);
+
+    // Build timeline in real-time from the shipment history checkpoints, newest first, with active milestone matching liveStatus
+    const liveTimeline = buildConsignmentTimeline(liveStatus, updatedHistory, origin, destination);
 
     const cleanNo = consignmentNo.trim().toUpperCase();
 
@@ -706,12 +862,12 @@ export const ShipmentManager: React.FC = () => {
         comments,
       },
       packagesData: packages,
-      shipmentHistory,
+      shipmentHistory: updatedHistory,
       adminMetadata: {
         client,
         agentName: selectedAgent,
         employee,
-        publishedOn: formattedNow,
+        publishedOn: bdNow.formatted,
         tags,
         categories: Object.keys(categories).filter((c) => categories[c]),
       },
@@ -742,9 +898,29 @@ export const ShipmentManager: React.FC = () => {
     try {
       await updateConsignment(updated);
       setSelectedNo(cleanNo);
+      setPublishCurrentStatus(liveStatus);
+      setStatusToast({
+        consignmentNo: cleanNo,
+        status: liveStatus,
+        location: publishLocation || destination,
+        date: effectiveDate,
+        time: effectiveTime,
+        remarks: publishRemarks,
+      });
+      setTimeout(() => setStatusToast(null), 2000);
       setSaveSuccessMsg(`Bill ${updated.consignmentNo} updated successfully! Live tracking synchronized in real time.`);
       setTimeout(() => setSaveSuccessMsg(null), 4000);
     } catch (err: any) {
+      setSelectedNo(cleanNo);
+      setStatusToast({
+        consignmentNo: cleanNo,
+        status: liveStatus,
+        location: publishLocation || destination,
+        date: effectiveDate,
+        time: effectiveTime,
+        remarks: publishRemarks,
+      });
+      setTimeout(() => setStatusToast(null), 2000);
       setSaveSuccessMsg(`Saved locally: ${err?.message || 'Ready for tracking'}`);
       setTimeout(() => setSaveSuccessMsg(null), 4000);
     }
@@ -829,7 +1005,66 @@ export const ShipmentManager: React.FC = () => {
 
   // Active Shipments View
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Real-time Status Update Popup Toast Modal */}
+      {statusToast && (
+        <div className="fixed top-5 right-5 z-[9999] max-w-md w-[calc(100vw-2.5rem)] bg-slate-900/95 backdrop-blur-md text-white p-5 rounded-2xl shadow-2xl border border-emerald-500/50 animate-in slide-in-from-top-4 duration-300">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 flex-shrink-0">
+                <CheckCircle className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  Status Updated Successfully!
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                </h4>
+                <p className="text-[11px] text-slate-300 font-mono mt-0.5">
+                  Consignment #{statusToast.consignmentNo}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setStatusToast(null)}
+              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="mt-3.5 pt-3 border-t border-slate-800 space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Current Live Status:</span>
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                {statusToast.status}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-slate-300 text-[11px]">
+              <span className="text-slate-400">Location:</span>
+              <span className="font-semibold">{statusToast.location}</span>
+            </div>
+            <div className="flex items-center justify-between text-slate-300 text-[11px]">
+              <span className="text-slate-400">Timestamp:</span>
+              <span>{statusToast.date} • {statusToast.time}</span>
+            </div>
+            {statusToast.remarks && (
+              <p className="text-[11px] text-slate-300 italic bg-slate-800/70 p-2 rounded-lg border border-slate-700/50">
+                "{statusToast.remarks}"
+              </p>
+            )}
+          </div>
+
+          <div className="mt-3.5 pt-2.5 border-t border-slate-800 flex items-center justify-between">
+            <span className="text-[10px] text-emerald-400 flex items-center gap-1.5 font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Live Synced to Client Portal
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono">Auto-closing in 2s</span>
+          </div>
+        </div>
+      )}
+
       {/* Top Bar: Selector, Views, Print & Live Tracking */}
       <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
@@ -1621,11 +1856,10 @@ export const ShipmentManager: React.FC = () => {
                       key={p}
                       type="button"
                       onClick={() => setHistoryPage(p)}
-                      className={`w-7 h-7 rounded text-xs font-bold transition cursor-pointer ${
-                        historyPage === p
-                          ? 'bg-[#1a6c7a] text-white shadow-xs'
-                          : 'border border-slate-300 text-slate-700 hover:bg-slate-100'
-                      }`}
+                      className={`w-7 h-7 rounded text-xs font-bold transition cursor-pointer ${historyPage === p
+                        ? 'bg-[#1a6c7a] text-white shadow-xs'
+                        : 'border border-slate-300 text-slate-700 hover:bg-slate-100'
+                        }`}
                     >
                       {p}
                     </button>
@@ -1651,27 +1885,84 @@ export const ShipmentManager: React.FC = () => {
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">
               Assign shipment to
             </h4>
+            {/* Client */}
             <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Client</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[11px] font-semibold text-slate-500">Client</label>
+                <button
+                  type="button"
+                  onClick={() => setShowAddClient(!showAddClient)}
+                  className="text-[10px] text-emerald-700 hover:underline font-bold cursor-pointer"
+                >
+                  {showAddClient ? 'Close' : '+ Add Client'}
+                </button>
+              </div>
+
+              {showAddClient && (
+                <form onSubmit={handleAddCustomClient} className="flex gap-1.5 mb-2">
+                  <input
+                    type="text"
+                    placeholder="New client name..."
+                    value={newClientInput}
+                    onChange={(e) => setNewClientInput(e.target.value)}
+                    className="flex-1 text-xs border border-emerald-400 rounded-lg px-2 py-1 outline-none"
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold cursor-pointer"
+                  >
+                    Add
+                  </button>
+                </form>
+              )}
+
               <select
                 value={client}
                 onChange={(e) => setClient(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white"
+                className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white text-slate-800 font-medium"
               >
-                <option>-- Select Client --</option>
-                <option>Muhammad Tahin (VIP)</option>
-                <option>Bengal Import Trading Ltd</option>
-                <option>Sylhet Garments Export</option>
+                {clients.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </select>
+
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {clients.filter((c) => !c.startsWith('--')).map((c) => (
+                  <span
+                    key={c}
+                    className="inline-flex items-center gap-1 text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200 max-w-full"
+                  >
+                    <span
+                      onClick={() => setClient(c)}
+                      className="truncate max-w-[150px] cursor-pointer hover:text-slate-900"
+                      title={`Select ${c}`}
+                    >
+                      {c}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveClient(c)}
+                      title={`Remove ${c}`}
+                      className="text-slate-400 hover:text-rose-600 font-bold ml-0.5 cursor-pointer"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
             </div>
 
+            {/* Agent Name */}
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-[11px] font-semibold text-slate-500">Agent Name</label>
                 <button
                   type="button"
                   onClick={() => setShowAddAgent(!showAddAgent)}
-                  className="text-[10px] text-emerald-700 hover:underline font-bold"
+                  className="text-[10px] text-emerald-700 hover:underline font-bold cursor-pointer"
                 >
                   {showAddAgent ? 'Close' : '+ Add Agent'}
                 </button>
@@ -1689,7 +1980,7 @@ export const ShipmentManager: React.FC = () => {
                   />
                   <button
                     type="submit"
-                    className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold"
+                    className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold cursor-pointer"
                   >
                     Add
                   </button>
@@ -1709,54 +2000,115 @@ export const ShipmentManager: React.FC = () => {
               </select>
 
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {agents.map((a) => (
+                {agents.filter((a) => !a.startsWith('--')).map((a) => (
                   <span
                     key={a}
                     className="inline-flex items-center gap-1 text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200 max-w-full"
                   >
-                    <span className="truncate max-w-[150px]">{a}</span>
-                    {agents.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveAgent(a)}
-                        title={`Remove ${a}`}
-                        className="text-slate-400 hover:text-rose-600 font-bold ml-0.5 cursor-pointer"
-                      >
-                        ×
-                      </button>
-                    )}
+                    <span
+                      onClick={() => setSelectedAgent(a)}
+                      className="truncate max-w-[150px] cursor-pointer hover:text-slate-900"
+                      title={`Select ${a}`}
+                    >
+                      {a}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAgent(a)}
+                      title={`Remove ${a}`}
+                      className="text-slate-400 hover:text-rose-600 font-bold ml-0.5 cursor-pointer"
+                    >
+                      ×
+                    </button>
                   </span>
                 ))}
               </div>
             </div>
 
+            {/* Employee */}
             <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Employee</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[11px] font-semibold text-slate-500">Employee</label>
+                <button
+                  type="button"
+                  onClick={() => setShowAddEmployee(!showAddEmployee)}
+                  className="text-[10px] text-emerald-700 hover:underline font-bold cursor-pointer"
+                >
+                  {showAddEmployee ? 'Close' : '+ Add Employee'}
+                </button>
+              </div>
+
+              {showAddEmployee && (
+                <form onSubmit={handleAddCustomEmployee} className="flex gap-1.5 mb-2">
+                  <input
+                    type="text"
+                    placeholder="New employee name..."
+                    value={newEmployeeInput}
+                    onChange={(e) => setNewEmployeeInput(e.target.value)}
+                    className="flex-1 text-xs border border-emerald-400 rounded-lg px-2 py-1 outline-none"
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold cursor-pointer"
+                  >
+                    Add
+                  </button>
+                </form>
+              )}
+
               <select
                 value={employee}
                 onChange={(e) => setEmployee(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white"
+                className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white text-slate-800 font-medium"
               >
-                <option>-- Select Employee --</option>
-                <option>SAIN Admin (sain_sakib6055)</option>
-                <option>Customs Officer (HSIA Airport)</option>
-                <option>Warehouse Manager (Uttara Hub)</option>
+                {employees.map((emp) => (
+                  <option key={emp} value={emp}>
+                    {emp}
+                  </option>
+                ))}
               </select>
+
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {employees.filter((emp) => !emp.startsWith('--')).map((emp) => (
+                  <span
+                    key={emp}
+                    className="inline-flex items-center gap-1 text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200 max-w-full"
+                  >
+                    <span
+                      onClick={() => setEmployee(emp)}
+                      className="truncate max-w-[150px] cursor-pointer hover:text-slate-900"
+                      title={`Select ${emp}`}
+                    >
+                      {emp}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveEmployee(emp)}
+                      title={`Remove ${emp}`}
+                      className="text-slate-400 hover:text-rose-600 font-bold ml-0.5 cursor-pointer"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Publish Box */}
+          {/* Shipment Status Box */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Publish</h4>
-              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
-                Live
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Shipment Status</h4>
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Live System
               </span>
             </div>
 
             <div className="space-y-1.5 text-xs text-slate-600 border-b border-slate-100 pb-3">
               <div className="flex items-center justify-between">
-                <span>Published on: <strong className="text-slate-800">{publishedOn}</strong></span>
+                <span>Last Status Update: <strong className="text-slate-800">{publishedOn}</strong></span>
                 <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                   Auto Updated
                 </span>
@@ -1765,7 +2117,7 @@ export const ShipmentManager: React.FC = () => {
 
             <div>
               <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                Current Status: <strong>{publishCurrentStatus}</strong>
+                Current Status: <strong className="text-emerald-700 font-bold">{publishCurrentStatus}</strong>
               </label>
             </div>
 
@@ -1804,20 +2156,20 @@ export const ShipmentManager: React.FC = () => {
               <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Status</label>
               <select
                 value={publishCurrentStatus}
-                onChange={(e) => setPublishCurrentStatus(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs bg-white font-medium"
+                onChange={(e) => handleStatusSelectChange(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs bg-white font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
               >
                 <option value="-- Select Type --">-- Select Type --</option>
                 <option value="Pending">Pending</option>
                 <option value="Received">Received</option>
-                <option value="On Hold by Customs">On Hold by Customs</option>
-                <option value="Out for delivery">Out for delivery</option>
                 <option value="In Transit">In Transit</option>
-                <option value="Enroute">Enroute</option>
+                <option value="En Route">En Route</option>
+                <option value="On Hold by Customs">On Hold by Customs</option>
+                <option value="At Bangladesh warehouse">At Bangladesh warehouse</option>
+                <option value="Out for delivery">Out for delivery</option>
                 <option value="Cancelled">Cancelled</option>
                 <option value="Delivered">Delivered</option>
                 <option value="Returned">Returned</option>
-                <option value="At Bangladesh warehouse">At Bangladesh warehouse</option>
               </select>
             </div>
 
@@ -1827,6 +2179,7 @@ export const ShipmentManager: React.FC = () => {
                 rows={2}
                 value={publishRemarks}
                 onChange={(e) => setPublishRemarks(e.target.value)}
+                placeholder="e.g. Customs clearance passed, en route to recipient"
                 className="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs"
               />
             </div>
@@ -1843,10 +2196,10 @@ export const ShipmentManager: React.FC = () => {
               <button
                 type="button"
                 onClick={handleSaveShipment}
-                className="px-6 py-2 bg-[#009b4d] hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition shadow-md flex items-center gap-1.5 cursor-pointer"
+                className="px-6 py-2 bg-[#009b4d] hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>Update</span>
+                <span>Update Status</span>
               </button>
             </div>
           </div>
