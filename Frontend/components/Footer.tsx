@@ -22,7 +22,11 @@ export const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           {/* Brand info (2 columns) */}
           <div className="lg:col-span-2 space-y-4">
-            <SainLogo variant="white" />
+            <img
+              src="/assets/images/SAIN_logo_gold.png"
+              alt="SAIN International Logistics"
+              className="h-4 sm:h-8 md:h-12 w-auto object-contain drop-shadow-[0_4px_16px_rgba(0,0,0,0.9)]"
+            />
             <p className="text-xs sm:text-sm text-slate-400 leading-relaxed max-w-sm">
               <strong>SAIN</strong> is a trusted international freight and courier partner connecting people and businesses with fast, secure, and reliable shipping services from Guangzhou and global hubs to Bangladesh.
             </p>
