@@ -2,8 +2,9 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   Consignment,
   INITIAL_CONSIGNMENTS,
-  getOrCreateConsignment,
   getStatusProgressAndColor,
+  buildConsignmentTimeline,
+  normalizeStatus,
 } from '../services/trackingData';
 
 export type AppTab = 'home' | 'about' | 'services' | 'contact' | 'track' | 'admin';
@@ -29,6 +30,7 @@ interface TrackingContextType {
   searchConsignment: (code: string) => Promise<Consignment>;
   updateConsignment: (consignment: Consignment) => Promise<void>;
   addConsignment: (consignment: Consignment) => Promise<void>;
+  deleteConsignment: (consignmentNo: string) => Promise<void>;
 }
 
 const TrackingContext = createContext<TrackingContextType | undefined>(undefined);
@@ -36,12 +38,18 @@ const TrackingContext = createContext<TrackingContextType | undefined>(undefined
 const LOCAL_STORAGE_CONSIGNMENTS_KEY = 'sain_logistics_consignments_data';
 const LOCAL_STORAGE_HISTORY_KEY = 'sain_tracking_search_history';
 
+// Keys to purge so demo data never persists or pollutes recent shipments
+const DEMO_CONSIGNMENT_KEYS = ['12345', 'SAIN-78492-BD', 'SAIN-SEA-99120', 'SAIN-HC-5501'];
+
 export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [allConsignments, setAllConsignments] = useState<Record<string, Consignment>>(() => {
     try {
       const stored = localStorage.getItem(LOCAL_STORAGE_CONSIGNMENTS_KEY);
       if (stored) {
-        return { ...INITIAL_CONSIGNMENTS, ...JSON.parse(stored) };
+        const parsed = JSON.parse(stored);
+        // Strip out any deprecated demo consignments from local storage
+        DEMO_CONSIGNMENT_KEYS.forEach((k) => delete parsed[k]);
+        return { ...INITIAL_CONSIGNMENTS, ...parsed };
       }
     } catch (e) {
       console.warn('LocalStorage error:', e);
@@ -52,11 +60,14 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [searchHistory, setSearchHistory] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: string[] = JSON.parse(saved);
+        return parsed.filter((item) => !DEMO_CONSIGNMENT_KEYS.includes(item.toUpperCase()));
+      }
     } catch {
       // ignore
     }
-    return ['SAINEX067638406', '12345', 'SAIN-78492-BD', 'SAIN-SEA-99120'];
+    return ['SAINEX067638406'];
   });
 
   const [activeConsignment, setActiveConsignment] = useState<Consignment | null>(null);
@@ -122,30 +133,96 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [searchHistory]);
 
+  // Initial backend fetch to ensure admin panel and client have live DB data
+  useEffect(() => {
+    const fetchBackendConsignments = async () => {
+      try {
+        const res = await fetch('http://127.0.0.1:8000/api/v1/couriers/consignments/', {
+          headers: { Accept: 'application/json' },
+        });
+        if (res.ok) {
+          const list = await res.json();
+          if (Array.isArray(list) && list.length > 0) {
+            setAllConsignments((prev) => {
+              const merged = { ...prev };
+              list.forEach((item: any) => {
+                if (item.consignment_no && !DEMO_CONSIGNMENT_KEYS.includes(item.consignment_no)) {
+                  merged[item.consignment_no] = mapDjangoToConsignment(item);
+                }
+              });
+              try {
+                localStorage.setItem(LOCAL_STORAGE_CONSIGNMENTS_KEY, JSON.stringify(merged));
+              } catch {}
+              return merged;
+            });
+          }
+        }
+      } catch (e) {
+        console.info('Django API initial fetch skipped (offline mode):', e);
+      }
+    };
+
+    fetchBackendConsignments();
+  }, []);
+
+  // Multi-tab and component real-time cross-talk synchronization
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === LOCAL_STORAGE_CONSIGNMENTS_KEY && e.newValue) {
+        try {
+          const data = JSON.parse(e.newValue);
+          setAllConsignments(data);
+          if (activeConsignment && data[activeConsignment.consignmentNo]) {
+            setActiveConsignment(data[activeConsignment.consignmentNo]);
+          }
+        } catch {}
+      }
+    };
+
+    const handleCustomUpdate = (e: any) => {
+      const updated = e.detail as Consignment;
+      if (updated && updated.consignmentNo) {
+        setAllConsignments((prev) => ({ ...prev, [updated.consignmentNo]: updated }));
+        if (activeConsignment?.consignmentNo === updated.consignmentNo) {
+          setActiveConsignment(updated);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('sain_consignment_updated', handleCustomUpdate);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('sain_consignment_updated', handleCustomUpdate);
+    };
+  }, [activeConsignment]);
+
   // Convert raw Django DRF response into clean Frontend Consignment format
   const mapDjangoToConsignment = (data: any): Consignment => {
     const rawMilestones = data.milestones || [];
-    const formattedTimeline = rawMilestones.map((m: any, idx: number) => ({
-      id: String(m.id || `m-${idx}`),
-      timestamp: `${m.date_str || ''} • ${m.time_str || ''}`.trim() || 'Recorded Status',
-      location: m.location || 'Dhaka Hub',
-      title: m.title || m.status || 'Status Update',
-      description: m.description || m.remarks || '',
-      status: (m.status === 'Delivered' ? 'completed' : idx === 0 ? 'current' : 'completed') as any,
-    }));
 
-    const formattedHistory = rawMilestones.map((m: any, idx: number) => ({
-      id: String(m.id || `sh-${idx}`),
-      date: m.date_str || '',
-      time: m.time_str || '',
-      location: m.location || '',
-      status: m.status || m.title || 'In Transit',
-      updatedBy: m.updated_by || 'SAIN International Logistics',
-      remarks: m.remarks || '',
-    }));
+    const formattedHistory = rawMilestones.map((m: any, idx: number) => {
+      const rawStatus = m.status || m.title || 'In Transit';
+      const cleanStatus = rawStatus.toLowerCase() === 'recived' ? 'Received' : rawStatus;
+      return {
+        id: String(m.id || `sh-${idx}`),
+        date: m.date_str || '',
+        time: m.time_str || '',
+        location: m.location || '',
+        status: cleanStatus,
+        updatedBy: m.updated_by || 'SAIN International Logistics',
+        remarks: m.remarks || '',
+      };
+    });
 
-    const liveStatus = data.status || 'At Bangladesh warehouse';
+    const liveStatus = normalizeStatus(data.status || 'At Bangladesh warehouse');
     const { progress, color } = getStatusProgressAndColor(liveStatus);
+    const liveTimeline = buildConsignmentTimeline(
+      liveStatus,
+      formattedHistory,
+      data.origin_city || 'Guangzhou',
+      data.destination_city || 'Dhaka'
+    );
 
     return {
       consignmentNo: data.consignment_no,
@@ -233,7 +310,7 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         weightG: p.weightG !== undefined ? Number(p.weightG) : (p.weight_g !== undefined ? Number(p.weight_g) : 0),
       })),
       shipmentHistory: formattedHistory,
-      timeline: formattedTimeline.length > 0 ? formattedTimeline : INITIAL_CONSIGNMENTS['SAINEX067638406']?.timeline || [],
+      timeline: liveTimeline,
       adminMetadata: {
         client: data.client || '',
         agentName: data.agent_name || '',
@@ -249,7 +326,7 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const searchConsignment = async (code: string): Promise<Consignment> => {
     const clean = code.trim();
     if (!clean) {
-      throw new Error('Please enter a consignment number (e.g. SAINEX067638406 or 12345)');
+      throw new Error('Please enter a consignment number (e.g. SAINEX067638406)');
     }
 
     setIsLoading(true);
@@ -277,12 +354,11 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return mapped;
       }
     } catch (apiErr) {
-      // Backend might be warming up or offline, fallback cleanly
       console.info('Django API query skipped, checking local store:', apiErr);
     }
 
     // 2. Fallback to Local Storage / In-memory Catalog
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await new Promise((resolve) => setTimeout(resolve, 200));
 
     try {
       let result = allConsignments[clean] || allConsignments[clean.toUpperCase()];
@@ -302,14 +378,11 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         );
         if (foundKey) {
           result = allConsignments[foundKey];
-        } else {
-          result = getOrCreateConsignment(clean);
-          setAllConsignments((prev) => {
-            const next = { ...prev, [clean.toUpperCase()]: result };
-            localStorage.setItem(LOCAL_STORAGE_CONSIGNMENTS_KEY, JSON.stringify(next));
-            return next;
-          });
         }
+      }
+
+      if (!result) {
+        throw new Error(`Consignment '${clean}' was not found. Please verify the consignment number or contact SAIN logistics support.`);
       }
 
       setActiveConsignment(result);
@@ -330,7 +403,13 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (consignmentNumber) {
       searchConsignment(consignmentNumber);
     } else if (!activeConsignment) {
-      searchConsignment('SAINEX067638406');
+      // Pick first active registered consignment if available, without forcing demo codes
+      const firstValid = Object.values(allConsignments).find(
+        (c) => c && !DEMO_CONSIGNMENT_KEYS.includes(c.consignmentNo)
+      );
+      if (firstValid) {
+        setActiveConsignment(firstValid);
+      }
     }
     setIsTrackingModalOpen(true);
   };
@@ -444,6 +523,29 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     await syncWithBackend(consignment);
   };
 
+  const deleteConsignment = async (consignmentNo: string) => {
+    setAllConsignments((prev) => {
+      const next = { ...prev };
+      delete next[consignmentNo];
+      try {
+        localStorage.setItem(LOCAL_STORAGE_CONSIGNMENTS_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    if (activeConsignment?.consignmentNo === consignmentNo) {
+      setActiveConsignment(null);
+    }
+
+    try {
+      await fetch(`http://127.0.0.1:8000/api/v1/couriers/track/${encodeURIComponent(consignmentNo)}/`, {
+        method: 'DELETE',
+      });
+    } catch (e) {
+      console.info('Backend delete skipped:', e);
+    }
+  };
+
   return (
     <TrackingContext.Provider
       value={{
@@ -467,6 +569,7 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         searchConsignment,
         updateConsignment,
         addConsignment,
+        deleteConsignment,
       }}
     >
       {children}
