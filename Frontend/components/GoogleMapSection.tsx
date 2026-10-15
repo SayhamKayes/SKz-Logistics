@@ -1,41 +1,43 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigation, ExternalLink } from 'lucide-react';
-
-/**
- * =========================================================================
- * 📍 GOOGLE MAP SECTION - LOCATION CONFIGURATION INSTRUCTIONS
- * =========================================================================
- * How to change or customize your Google Map location:
- * 
- * Option 1 (Simple Address Change):
- * - Change the `LOCATION_ADDRESS` text below to any address or coordinates.
- *   Example: "House 15, Road No. 5, Block B, Uttara-1230, Dhaka, Bangladesh"
- * 
- * Option 2 (Custom Google Maps Embed URL):
- * - Go to Google Maps (https://maps.google.com).
- * - Search your exact location, click "Share" -> "Embed a map".
- * - Copy the `src="..."` URL from the iframe and paste it into `CUSTOM_EMBED_URL` below.
- * - If `CUSTOM_EMBED_URL` is empty, the component automatically builds the embed.
- * =========================================================================
- */
-
-// 1. Address displayed on the location card
-export const LOCATION_ADDRESS = 'House 15, Road No. 5, Block B, Uttara-1230, Bangladesh';
-export const LOCATION_TITLE = 'SAIN International Logistics';
-
-// 2. Custom Embed URL (Leave empty to use automatic address query)
-const CUSTOM_EMBED_URL = '';
+import { DEFAULT_CONTACT_CONFIG, ContactConfig } from './admin/ContactContentEditor';
 
 export const GoogleMapSection: React.FC = () => {
+  const [config, setConfig] = useState<ContactConfig>(() => {
+    try {
+      const stored = localStorage.getItem('sain_contact_content_config');
+      if (stored) return { ...DEFAULT_CONTACT_CONFIG, ...JSON.parse(stored) };
+    } catch {}
+    return DEFAULT_CONTACT_CONFIG;
+  });
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      try {
+        const stored = localStorage.getItem('sain_contact_content_config');
+        if (stored) setConfig({ ...DEFAULT_CONTACT_CONFIG, ...JSON.parse(stored) });
+      } catch {}
+    };
+    window.addEventListener('sain_contact_content_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('sain_contact_content_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
+  const locationTitle = config.mapLocationTitle || DEFAULT_CONTACT_CONFIG.mapLocationTitle;
+  const locationAddress = config.mapAddress || DEFAULT_CONTACT_CONFIG.mapAddress;
+
   // Build map URL if no custom URL is provided
   const embedUrl =
-    CUSTOM_EMBED_URL ||
+    config.mapEmbedUrl ||
     `https://maps.google.com/maps?q=${encodeURIComponent(
-      'SAIN International Logistics, House 15, Road 5, Block B, Uttara, Dhaka-1230, Bangladesh'
+      `${locationTitle}, ${locationAddress}`
     )}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
 
   const directionsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-    'SAIN International Logistics, House 15, Road 5, Block B, Uttara, Dhaka-1230, Bangladesh'
+    `${locationTitle}, ${locationAddress}`
   )}`;
 
   return (
@@ -60,10 +62,10 @@ export const GoogleMapSection: React.FC = () => {
           <div className="flex items-start justify-between gap-2">
             <div>
               <h4 className="font-bold text-sm sm:text-base text-[#0f172a] leading-tight">
-                {LOCATION_TITLE}
+                {locationTitle}
               </h4>
               <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                {LOCATION_ADDRESS}
+                {locationAddress}
               </p>
               <span className="text-[11px] text-slate-400 mt-0.5 block">
                 Verified Headquarters
