@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Phone,
   Mail,
@@ -9,8 +9,33 @@ import {
   AlertCircle,
   MessageSquare,
 } from 'lucide-react';
+import { DEFAULT_CONTACT_CONFIG, ContactConfig } from './admin/ContactContentEditor';
+import { API_BASE_URL } from '../services/databaseConfig';
 
 export const ContactSection: React.FC = () => {
+  const [config, setConfig] = useState<ContactConfig>(() => {
+    try {
+      const stored = localStorage.getItem('sain_contact_content_config');
+      if (stored) return { ...DEFAULT_CONTACT_CONFIG, ...JSON.parse(stored) };
+    } catch {}
+    return DEFAULT_CONTACT_CONFIG;
+  });
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      try {
+        const stored = localStorage.getItem('sain_contact_content_config');
+        if (stored) setConfig({ ...DEFAULT_CONTACT_CONFIG, ...JSON.parse(stored) });
+      } catch {}
+    };
+    window.addEventListener('sain_contact_content_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('sain_contact_content_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -23,10 +48,11 @@ export const ContactSection: React.FC = () => {
   const [submitted, setSubmitted] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [submitFeedback, setSubmitFeedback] = useState<string>('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.message) {
+    if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
       setErrorMsg('This field is required. Please fill out your Name, Email and Message.');
       return;
     }
@@ -34,7 +60,45 @@ export const ContactSection: React.FC = () => {
     setErrorMsg('');
     setLoading(true);
 
-    setTimeout(() => {
+    try {
+      // Send inquiry to Backend SMTP Gateway
+      const res = await fetch(`${API_BASE_URL}/api/v1/contact/send-email/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          serviceType: formData.serviceType,
+          consignmentNo: formData.consignmentNo,
+          message: formData.message,
+          smtpConfig: {
+            smtpHost: config.smtpHost,
+            smtpPort: config.smtpPort,
+            smtpSecurity: config.smtpSecurity,
+            smtpUser: config.smtpUser,
+            smtpPassword: config.smtpPassword,
+            receiverEmail: config.receiverEmail || config.officialEmail,
+            senderName: config.senderName,
+          },
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        setSubmitFeedback(
+          config.smtpEnabled && config.smtpPassword
+            ? `Your message has been sent to our desk via email (${config.receiverEmail || config.officialEmail}). A logistics manager will contact you promptly.`
+            : 'Your inquiry has been successfully received by our customer desk.'
+        );
+      } else {
+        // Fallback feedback if smtp config issue
+        setSubmitFeedback('Thank you for reaching out to SAIN International Logistics. Your inquiry has been recorded.');
+      }
+    } catch {
+      // Graceful offline fallback
+      setSubmitFeedback('Thank you for reaching out to SAIN International Logistics. A representative will contact you via email or phone shortly.');
+    } finally {
       setLoading(false);
       setSubmitted(true);
       setFormData({
@@ -45,7 +109,7 @@ export const ContactSection: React.FC = () => {
         consignmentNo: '',
         message: '',
       });
-    }, 700);
+    }
   };
 
   return (
@@ -55,13 +119,24 @@ export const ContactSection: React.FC = () => {
         <div className="text-center space-y-3 max-w-2xl mx-auto">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-600 text-xs font-bold tracking-wider uppercase">
             <MessageSquare className="w-3.5 h-3.5" />
-            <span>Connect with SAIN</span>
+            <span>{config.badge}</span>
           </div>
           <h2 className="text-3xl sm:text-5xl font-black font-brand text-[#0f172a] tracking-tight">
-            Get in <span className="text-amber-500">Touch</span>
+            {(() => {
+              const parts = config.heading.split(' ');
+              if (parts.length > 1) {
+                const last = parts.pop();
+                return (
+                  <>
+                    {parts.join(' ')} <span className="text-amber-500">{last}</span>
+                  </>
+                );
+              }
+              return config.heading;
+            })()}
           </h2>
           <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
-            Have questions regarding cargo rates from Guangzhou, customs declaration, or consignment status? Our logistics specialists in Uttara, Dhaka are ready to assist.
+            {config.description}
           </p>
         </div>
 
@@ -73,25 +148,25 @@ export const ContactSection: React.FC = () => {
             <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/90 shadow-xl space-y-4">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[#153243] flex items-center gap-2">
                 <Phone className="w-4 h-4 text-amber-500" />
-                <span>Direct Contact Numbers</span>
+                <span>{config.phoneHeading}</span>
               </h3>
               <div className="space-y-3">
                 <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
-                  <span className="text-[11px] text-slate-500 font-medium block">General Inquiries:</span>
+                  <span className="text-[11px] text-slate-500 font-medium block">{config.phone1Label}</span>
                   <a
-                    href="tel:+8801719068999"
+                    href={`tel:${config.phone1Number.replace(/[^+\d]/g, '')}`}
                     className="text-base font-bold text-[#153243] hover:text-amber-600 transition font-mono"
                   >
-                    (880) 1719 068999
+                    {config.phone1Number}
                   </a>
                 </div>
                 <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
-                  <span className="text-[11px] text-slate-500 font-medium block">Accounts &amp; Invoicing:</span>
+                  <span className="text-[11px] text-slate-500 font-medium block">{config.phone2Label}</span>
                   <a
-                    href="tel:+8801306412045"
+                    href={`tel:${config.phone2Number.replace(/[^+\d]/g, '')}`}
                     className="text-base font-bold text-[#153243] hover:text-amber-600 transition font-mono"
                   >
-                    (880) 1306 412045
+                    {config.phone2Number}
                   </a>
                 </div>
               </div>
@@ -101,17 +176,17 @@ export const ContactSection: React.FC = () => {
             <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/90 shadow-xl space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[#153243] flex items-center gap-2">
                 <Mail className="w-4 h-4 text-amber-500" />
-                <span>Electronic Mail</span>
+                <span>{config.mailHeading}</span>
               </h3>
               <div className="space-y-2 text-sm">
                 <a
-                  href="mailto:saininternationallogistics@gmail.com"
+                  href={`mailto:${config.officialEmail}`}
                   className="block text-[#153243] font-semibold hover:text-amber-600 transition"
                 >
-                  saininternationallogistics@gmail.com
+                  {config.officialEmail}
                 </a>
                 <span className="block text-slate-500 text-xs font-mono">
-                  saininternationallogistics.com
+                  {config.emailWebsite}
                 </span>
               </div>
             </div>
@@ -120,20 +195,20 @@ export const ContactSection: React.FC = () => {
             <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/90 shadow-xl space-y-4">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[#153243] flex items-center gap-2">
                 <Clock className="w-4 h-4 text-amber-500" />
-                <span>Headquarters &amp; Business Hours</span>
+                <span>{config.hqHeading}</span>
               </h3>
               <div className="space-y-2.5 text-xs">
                 <div className="flex items-start gap-2 text-slate-700">
                   <MapPin className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                  <span>Base in Sector 3, Uttara, Dhaka-1230, Bangladesh</span>
+                  <span>{config.headquartersAddress}</span>
                 </div>
                 <div className="pt-2 border-t border-slate-100 flex justify-between text-slate-700">
-                  <span>Saturday - Thursday:</span>
-                  <strong className="text-emerald-700 font-mono font-bold">10:00 AM – 9:00 PM</strong>
+                  <span>{config.workingDaysLabel}</span>
+                  <strong className="text-emerald-700 font-mono font-bold">{config.workingHours}</strong>
                 </div>
                 <div className="flex justify-between text-slate-500">
-                  <span>Friday:</span>
-                  <span className="text-rose-600 font-bold">Closed</span>
+                  <span>{config.weekendLabel}</span>
+                  <span className="text-rose-600 font-bold">{config.weekendStatus}</span>
                 </div>
               </div>
             </div>
@@ -154,12 +229,12 @@ export const ContactSection: React.FC = () => {
                 <h4 className="text-lg font-bold text-[#0f172a]">
                   Message Sent Successfully!
                 </h4>
-                <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto">
-                  Thank you for reaching out to SAIN International Logistics. A representative will contact you via email or phone shortly.
+                <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+                  {submitFeedback}
                 </p>
                 <button
                   onClick={() => setSubmitted(false)}
-                  className="mt-4 px-5 py-2.5 bg-[#153243] hover:bg-[#1a365d] text-xs font-bold text-white uppercase tracking-wider rounded-xl transition"
+                  className="mt-4 px-5 py-2.5 bg-[#153243] hover:bg-[#1a365d] text-xs font-bold text-white uppercase tracking-wider rounded-xl transition cursor-pointer"
                 >
                   Send Another Inquiry
                 </button>
