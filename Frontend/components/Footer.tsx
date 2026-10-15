@@ -24,7 +24,7 @@ export const Footer: React.FC = () => {
           <div className="lg:col-span-2 space-y-4">
             <SainLogo variant="white" />
             <p className="text-xs sm:text-sm text-slate-400 leading-relaxed max-w-sm">
-              SAIN Ship is a trusted international freight and courier partner connecting people and businesses with fast, secure, and reliable shipping services from Guangzhou and global hubs to Bangladesh.
+              <strong>SAIN</strong> is a trusted international freight and courier partner connecting people and businesses with fast, secure, and reliable shipping services from Guangzhou and global hubs to Bangladesh.
             </p>
           </div>
 
