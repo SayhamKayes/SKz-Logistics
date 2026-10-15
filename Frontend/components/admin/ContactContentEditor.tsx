@@ -1,69 +1,191 @@
 import React, { useState } from 'react';
-import { Save, CheckCircle, Phone, MapPin, Mail, Clock, MessageSquare, Building2, Sparkles } from 'lucide-react';
+import {
+  Save,
+  CheckCircle,
+  Phone,
+  MapPin,
+  Mail,
+  Clock,
+  Sparkles,
+  Server,
+  Lock,
+  Eye,
+  EyeOff,
+  Send,
+  AlertCircle,
+  ExternalLink,
+} from 'lucide-react';
+import { API_BASE_URL } from '../../services/databaseConfig';
 
-interface ContactConfig {
-  headquartersAddress: string;
-  headquartersPhone: string;
-  secondaryPhone: string;
+export interface ContactConfig {
+  // Header
+  badge: string;
+  heading: string;
+  description: string;
+
+  // Direct Contact Numbers
+  phoneHeading: string;
+  phone1Label: string;
+  phone1Number: string;
+  phone2Label: string;
+  phone2Number: string;
+
+  // Electronic Mail
+  mailHeading: string;
   officialEmail: string;
-  supportEmail: string;
-  whatsappNumber: string;
+  emailWebsite: string;
+
+  // Headquarters & Hours
+  hqHeading: string;
+  headquartersAddress: string;
+  workingDaysLabel: string;
   workingHours: string;
-  guangzhouHub: string;
-  yiwuHub: string;
-  shenzhenHub: string;
+  weekendLabel: string;
+  weekendStatus: string;
+
+  // Google Map Location (Contact Page)
+  mapLocationTitle: string;
+  mapAddress: string;
+  mapEmbedUrl: string;
+
+  // SMTP Gateway Configuration
+  smtpEnabled: boolean;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecurity: 'tls' | 'ssl';
+  smtpUser: string;
+  smtpPassword: string;
+  receiverEmail: string;
+  senderName: string;
 }
 
-const DEFAULT_CONTACT_CONFIG: ContactConfig = {
-  headquartersAddress: '15/B, Uttara Metro Center, Dhaka 1230 Bangladesh',
-  headquartersPhone: '+880171906999',
-  secondaryPhone: '+8801731939325',
+export const DEFAULT_CONTACT_CONFIG: ContactConfig = {
+  badge: 'Connect with SAIN',
+  heading: 'Get in Touch',
+  description: 'Have questions regarding cargo rates from Guangzhou, customs declaration, or consignment status? Our logistics specialists in Uttara, Dhaka are ready to assist.',
+
+  phoneHeading: 'Direct Contact Numbers',
+  phone1Label: 'General Inquiries:',
+  phone1Number: '(880) 1719 068999',
+  phone2Label: 'Accounts & Invoicing:',
+  phone2Number: '(880) 1306 412045',
+
+  mailHeading: 'Electronic Mail',
   officialEmail: 'saininternationallogistics@gmail.com',
-  supportEmail: 'support@sainlogistics.com',
-  whatsappNumber: '+880171906999',
-  workingHours: 'Saturday – Thursday: 9:00 AM – 8:00 PM (BST)',
-  guangzhouHub: 'Room 302, Building A, Longhai Logistics Park, Baiyun District, Guangzhou, Guangdong, China',
-  yiwuHub: 'Warehouse 12, International Trade City Logistics Zone, Chouzhou North Road, Yiwu, Zhejiang, China',
-  shenzhenHub: 'Unit 5, Baoan International Airport Logistics Zone, Shenzhen, Guangdong, China',
+  emailWebsite: 'saininternationallogistics.com',
+
+  hqHeading: 'Headquarters & Business Hours',
+  headquartersAddress: 'Base in Sector 3, Uttara, Dhaka-1230, Bangladesh',
+  workingDaysLabel: 'Saturday - Thursday:',
+  workingHours: '10:00 AM – 9:00 PM',
+  weekendLabel: 'Friday:',
+  weekendStatus: 'Closed',
+
+  mapLocationTitle: 'SAIN International Logistics',
+  mapAddress: 'House 15, Road No. 5, Block B, Uttara-1230, Bangladesh',
+  mapEmbedUrl: '',
+
+  smtpEnabled: true,
+  smtpHost: 'smtp.gmail.com',
+  smtpPort: 587,
+  smtpSecurity: 'tls',
+  smtpUser: 'saininternationallogistics@gmail.com',
+  smtpPassword: '',
+  receiverEmail: 'saininternationallogistics@gmail.com',
+  senderName: 'SAIN Logistics Web Desk',
 };
 
 export const ContactContentEditor: React.FC = () => {
   const [config, setConfig] = useState<ContactConfig>(() => {
     try {
       const stored = localStorage.getItem('sain_contact_content_config');
-      if (stored) return JSON.parse(stored);
-    } catch {
-      // ignore
-    }
+      if (stored) {
+        return { ...DEFAULT_CONTACT_CONFIG, ...JSON.parse(stored) };
+      }
+    } catch {}
     return DEFAULT_CONTACT_CONFIG;
   });
 
   const [saved, setSaved] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // SMTP Test state
+  const [testLoading, setTestLoading] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem('sain_contact_content_config', JSON.stringify(config));
+    window.dispatchEvent(new Event('sain_contact_content_updated'));
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
 
-  const resetDefaults = () => {
-    if (window.confirm('Reset contact settings to default?')) {
+  const handleResetDefaults = () => {
+    if (window.confirm('Reset all contact and location settings to default?')) {
       setConfig(DEFAULT_CONTACT_CONFIG);
       localStorage.setItem('sain_contact_content_config', JSON.stringify(DEFAULT_CONTACT_CONFIG));
+      window.dispatchEvent(new Event('sain_contact_content_updated'));
+    }
+  };
+
+  const handleTestSmtp = async () => {
+    if (!config.smtpUser || !config.smtpPassword) {
+      alert('Please fill out SMTP User Email and Password/App Password before testing.');
+      return;
+    }
+
+    setTestLoading(true);
+    setTestResult(null);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/contact/test-smtp/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          smtpHost: config.smtpHost,
+          smtpPort: config.smtpPort,
+          smtpSecurity: config.smtpSecurity,
+          smtpUser: config.smtpUser,
+          smtpPassword: config.smtpPassword,
+          receiverEmail: config.receiverEmail || config.smtpUser,
+          senderName: config.senderName,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setTestResult({
+          success: true,
+          message: data.message || `Test email successfully delivered to ${config.receiverEmail || config.smtpUser}!`,
+        });
+      } else {
+        setTestResult({
+          success: false,
+          message: data.error || 'Failed to authenticate with SMTP server. Please verify your host and password/app password.',
+        });
+      }
+    } catch (err: any) {
+      setTestResult({
+        success: false,
+        message: `Network/Backend connection error: ${err.message || 'Make sure the backend is running.'}`,
+      });
+    } finally {
+      setTestLoading(false);
     }
   };
 
   return (
     <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xs space-y-6">
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-3">
         <div>
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <Phone className="w-5 h-5 text-[#1a6c7a]" />
-            <span>Contact Information & International Hubs</span>
+            <span>Contact Section, Map Location & SMTP Settings</span>
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Manage Dhaka headquarters contacts, emergency lines, and China warehouse drop-off addresses.
+            Configure direct phone numbers, email addresses, office hours, map coordinates, and customer email dispatch SMTP.
           </p>
         </div>
 
@@ -71,161 +193,545 @@ export const ContactContentEditor: React.FC = () => {
           {saved && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold animate-in fade-in">
               <CheckCircle className="w-4 h-4" />
-              <span>Contact Details Updated</span>
+              <span>Saved & Live on Website</span>
             </span>
           )}
           <button
             type="button"
-            onClick={resetDefaults}
-            className="text-xs font-semibold px-3 py-1.5 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg transition"
+            onClick={handleResetDefaults}
+            className="text-xs font-semibold px-3 py-1.5 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg transition cursor-pointer"
           >
             Reset Defaults
           </button>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Section 1: Headquarters */}
-        <div>
-          <h4 className="text-xs font-bold uppercase tracking-wider text-[#1a6c7a] mb-3 flex items-center gap-1.5">
-            <Building2 className="w-4 h-4" />
-            <span>Dhaka Headquarters & Direct Lines</span>
+      <form onSubmit={handleSave} className="space-y-6">
+        {/* ============================================================== */}
+        {/* 1. SECTION HEADER                                              */}
+        {/* ============================================================== */}
+        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-[#1a6c7a] border-b border-slate-200 pb-2">
+            1. Section Heading & Intro
           </h4>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
+            <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Headquarters Physical Address
+                Top Badge / Pill
               </label>
               <input
                 type="text"
-                value={config.headquartersAddress}
-                onChange={(e) => setConfig({ ...config, headquartersAddress: e.target.value })}
-                className="w-full text-xs font-semibold border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a]"
+                value={config.badge}
+                onChange={(e) => setConfig({ ...config, badge: e.target.value })}
+                className="w-full text-xs font-bold border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a] bg-white"
+                placeholder="Connect with SAIN"
                 required
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Primary Hotline (Call & SMS)
+                Main Heading
               </label>
               <input
                 type="text"
-                value={config.headquartersPhone}
-                onChange={(e) => setConfig({ ...config, headquartersPhone: e.target.value })}
-                className="w-full text-xs font-semibold border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a]"
+                value={config.heading}
+                onChange={(e) => setConfig({ ...config, heading: e.target.value })}
+                className="w-full text-xs font-bold border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a] bg-white"
+                placeholder="Get in Touch"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Description / Subtext
+            </label>
+            <textarea
+              rows={2}
+              value={config.description}
+              onChange={(e) => setConfig({ ...config, description: e.target.value })}
+              className="w-full text-xs border border-slate-300 rounded-lg p-2.5 outline-none focus:border-[#1a6c7a] bg-white"
+              placeholder="Have questions regarding cargo rates from Guangzhou..."
+              required
+            />
+          </div>
+        </div>
+
+        {/* ============================================================== */}
+        {/* 2. DIRECT CONTACT NUMBERS                                      */}
+        {/* ============================================================== */}
+        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-[#1a6c7a] border-b border-slate-200 pb-2 flex items-center gap-2">
+            <Phone className="w-4 h-4 text-amber-500" />
+            <span>2. Direct Phone Numbers</span>
+          </h4>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Card Header Title
+            </label>
+            <input
+              type="text"
+              value={config.phoneHeading}
+              onChange={(e) => setConfig({ ...config, phoneHeading: e.target.value })}
+              className="w-full text-xs font-bold border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a] bg-white"
+              placeholder="Direct Contact Numbers"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Number 1 */}
+            <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2">
+              <span className="text-[10px] font-bold uppercase text-amber-600 block">Phone Line 1</span>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">Label Text</label>
+                <input
+                  type="text"
+                  value={config.phone1Label}
+                  onChange={(e) => setConfig({ ...config, phone1Label: e.target.value })}
+                  className="w-full text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#1a6c7a]"
+                  placeholder="General Inquiries:"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">Phone Number</label>
+                <input
+                  type="text"
+                  value={config.phone1Number}
+                  onChange={(e) => setConfig({ ...config, phone1Number: e.target.value })}
+                  className="w-full text-xs font-mono font-bold text-[#153243] border border-slate-300 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#1a6c7a]"
+                  placeholder="(880) 1719 068999"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Number 2 */}
+            <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2">
+              <span className="text-[10px] font-bold uppercase text-[#1a6c7a] block">Phone Line 2</span>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">Label Text</label>
+                <input
+                  type="text"
+                  value={config.phone2Label}
+                  onChange={(e) => setConfig({ ...config, phone2Label: e.target.value })}
+                  className="w-full text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#1a6c7a]"
+                  placeholder="Accounts & Invoicing:"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">Phone Number</label>
+                <input
+                  type="text"
+                  value={config.phone2Number}
+                  onChange={(e) => setConfig({ ...config, phone2Number: e.target.value })}
+                  className="w-full text-xs font-mono font-bold text-[#153243] border border-slate-300 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#1a6c7a]"
+                  placeholder="(880) 1306 412045"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ============================================================== */}
+        {/* 3. ELECTRONIC MAIL & HEADQUARTERS                              */}
+        {/* ============================================================== */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Email Settings */}
+          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#1a6c7a] border-b border-slate-200 pb-2 flex items-center gap-2">
+              <Mail className="w-4 h-4 text-amber-500" />
+              <span>3. Electronic Mail Info</span>
+            </h4>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Email Box Header
+              </label>
+              <input
+                type="text"
+                value={config.mailHeading}
+                onChange={(e) => setConfig({ ...config, mailHeading: e.target.value })}
+                className="w-full text-xs font-semibold border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a] bg-white"
+                placeholder="Electronic Mail"
                 required
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Secondary Line / Emergency Desk
-              </label>
-              <input
-                type="text"
-                value={config.secondaryPhone}
-                onChange={(e) => setConfig({ ...config, secondaryPhone: e.target.value })}
-                className="w-full text-xs font-semibold border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a]"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Primary Official Email
+                Official Email Address
               </label>
               <input
                 type="email"
                 value={config.officialEmail}
                 onChange={(e) => setConfig({ ...config, officialEmail: e.target.value })}
-                className="w-full text-xs font-semibold border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a]"
+                className="w-full text-xs font-semibold border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a] bg-white"
+                placeholder="saininternationallogistics@gmail.com"
                 required
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                WhatsApp Live Support Number
+                Domain / Subtext
               </label>
               <input
                 type="text"
-                value={config.whatsappNumber}
-                onChange={(e) => setConfig({ ...config, whatsappNumber: e.target.value })}
-                className="w-full text-xs font-semibold border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a]"
-                required
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Customer Service Operating Hours
-              </label>
-              <input
-                type="text"
-                value={config.workingHours}
-                onChange={(e) => setConfig({ ...config, workingHours: e.target.value })}
-                className="w-full text-xs font-semibold border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a]"
+                value={config.emailWebsite}
+                onChange={(e) => setConfig({ ...config, emailWebsite: e.target.value })}
+                className="w-full text-xs font-mono border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a] bg-white"
+                placeholder="saininternationallogistics.com"
                 required
               />
             </div>
           </div>
-        </div>
 
-        {/* Section 2: China Receiving Hubs */}
-        <div className="pt-4 border-t border-slate-100">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-[#1a6c7a] mb-3 flex items-center gap-1.5">
-            <MapPin className="w-4 h-4" />
-            <span>China Forwarding Hubs & Drop-Off Warehouses</span>
-          </h4>
+          {/* Headquarters & Hours */}
+          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#1a6c7a] border-b border-slate-200 pb-2 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-amber-500" />
+              <span>4. Headquarters & Hours</span>
+            </h4>
 
-          <div className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Guangzhou Receiving Hub (Air & Sea Consolidation)
+                Header Title
               </label>
-              <textarea
-                rows={2}
-                value={config.guangzhouHub}
-                onChange={(e) => setConfig({ ...config, guangzhouHub: e.target.value })}
-                className="w-full text-xs border border-slate-300 rounded-lg p-3 outline-none focus:border-[#1a6c7a]"
+              <input
+                type="text"
+                value={config.hqHeading}
+                onChange={(e) => setConfig({ ...config, hqHeading: e.target.value })}
+                className="w-full text-xs font-semibold border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a] bg-white"
+                placeholder="Headquarters & Business Hours"
                 required
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Yiwu Wholesale Cargo Facility
+                Physical Address
               </label>
-              <textarea
-                rows={2}
-                value={config.yiwuHub}
-                onChange={(e) => setConfig({ ...config, yiwuHub: e.target.value })}
-                className="w-full text-xs border border-slate-300 rounded-lg p-3 outline-none focus:border-[#1a6c7a]"
+              <input
+                type="text"
+                value={config.headquartersAddress}
+                onChange={(e) => setConfig({ ...config, headquartersAddress: e.target.value })}
+                className="w-full text-xs font-semibold border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a] bg-white"
+                placeholder="Base in Sector 3, Uttara, Dhaka-1230, Bangladesh"
                 required
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Shenzhen Tech & Air Cargo Hub
-              </label>
-              <textarea
-                rows={2}
-                value={config.shenzhenHub}
-                onChange={(e) => setConfig({ ...config, shenzhenHub: e.target.value })}
-                className="w-full text-xs border border-slate-300 rounded-lg p-3 outline-none focus:border-[#1a6c7a]"
-                required
-              />
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">Working Days</label>
+                <input
+                  type="text"
+                  value={config.workingDaysLabel}
+                  onChange={(e) => setConfig({ ...config, workingDaysLabel: e.target.value })}
+                  className="w-full text-xs border border-slate-300 rounded-lg px-2 py-1.5 outline-none focus:border-[#1a6c7a] bg-white"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">Hours</label>
+                <input
+                  type="text"
+                  value={config.workingHours}
+                  onChange={(e) => setConfig({ ...config, workingHours: e.target.value })}
+                  className="w-full text-xs font-semibold text-emerald-700 border border-slate-300 rounded-lg px-2 py-1.5 outline-none focus:border-[#1a6c7a] bg-white"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">Weekend Day</label>
+                <input
+                  type="text"
+                  value={config.weekendLabel}
+                  onChange={(e) => setConfig({ ...config, weekendLabel: e.target.value })}
+                  className="w-full text-xs border border-slate-300 rounded-lg px-2 py-1.5 outline-none focus:border-[#1a6c7a] bg-white"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">Weekend Status</label>
+                <input
+                  type="text"
+                  value={config.weekendStatus}
+                  onChange={(e) => setConfig({ ...config, weekendStatus: e.target.value })}
+                  className="w-full text-xs font-bold text-rose-600 border border-slate-300 rounded-lg px-2 py-1.5 outline-none focus:border-[#1a6c7a] bg-white"
+                  required
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="pt-4 border-t border-slate-100 flex justify-end">
+        {/* ============================================================== */}
+        {/* 4. GOOGLE MAP LOCATION (Contact Page)                          */}
+        {/* ============================================================== */}
+        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#1a6c7a] flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-rose-500" />
+              <span>5. Google Map Location (Contact Page)</span>
+            </h4>
+            <span className="text-[10px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-bold">
+              Integrated Map
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Map Card Title
+              </label>
+              <input
+                type="text"
+                value={config.mapLocationTitle}
+                onChange={(e) => setConfig({ ...config, mapLocationTitle: e.target.value })}
+                className="w-full text-xs font-bold border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a] bg-white"
+                placeholder="SAIN International Logistics"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Map Location Physical Address (Uttara, Dhaka)
+              </label>
+              <input
+                type="text"
+                value={config.mapAddress}
+                onChange={(e) => setConfig({ ...config, mapAddress: e.target.value })}
+                className="w-full text-xs font-semibold border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a] bg-white"
+                placeholder="House 15, Road No. 5, Block B, Uttara-1230, Bangladesh"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Custom Google Maps Embed URL (Optional - leave empty to auto-build from address)
+            </label>
+            <input
+              type="text"
+              value={config.mapEmbedUrl}
+              onChange={(e) => setConfig({ ...config, mapEmbedUrl: e.target.value })}
+              className="w-full text-xs font-mono border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a] bg-white"
+              placeholder="https://maps.google.com/maps?q=... or leave blank"
+            />
+            <span className="text-[10px] text-slate-400 mt-1 block">
+              If left empty, Google Maps will automatically locate and pin the physical address specified above.
+            </span>
+          </div>
+        </div>
+
+        {/* ============================================================== */}
+        {/* 5. SMTP EMAIL NOTIFICATION CONFIGURATION                       */}
+        {/* ============================================================== */}
+        <div className="bg-gradient-to-br from-slate-900 to-[#0f1d26] p-6 rounded-2xl text-white space-y-5 border border-slate-800 shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-amber-500/20 text-amber-400 rounded-xl border border-amber-500/30">
+                <Server className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>6. Contact Form SMTP Gateway Setup</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
+                    Auto-Forward to Inbox
+                  </span>
+                </h4>
+                <p className="text-xs text-slate-400">
+                  When visitors click &quot;Submit Message&quot; on the website, receive their full inquiry directly to your inbox.
+                </p>
+              </div>
+            </div>
+
+            <label className="flex items-center gap-2 cursor-pointer self-start sm:self-auto">
+              <span className="text-xs font-semibold text-slate-300">Enable SMTP:</span>
+              <input
+                type="checkbox"
+                checked={config.smtpEnabled}
+                onChange={(e) => setConfig({ ...config, smtpEnabled: e.target.checked })}
+                className="w-4 h-4 accent-amber-500 cursor-pointer"
+              />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">
+                SMTP Server / Host
+              </label>
+              <input
+                type="text"
+                value={config.smtpHost}
+                onChange={(e) => setConfig({ ...config, smtpHost: e.target.value })}
+                className="w-full text-xs font-mono bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none focus:border-amber-400"
+                placeholder="smtp.gmail.com"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">
+                SMTP Port
+              </label>
+              <input
+                type="number"
+                value={config.smtpPort}
+                onChange={(e) => setConfig({ ...config, smtpPort: parseInt(e.target.value) || 587 })}
+                className="w-full text-xs font-mono bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none focus:border-amber-400"
+                placeholder="587"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">
+                Security Protocol
+              </label>
+              <select
+                value={config.smtpSecurity}
+                onChange={(e) => setConfig({ ...config, smtpSecurity: e.target.value as 'tls' | 'ssl' })}
+                className="w-full text-xs bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none focus:border-amber-400"
+              >
+                <option value="tls">STARTTLS (Port 587 / Default)</option>
+                <option value="ssl">SSL / TLS (Port 465)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">
+                SMTP Username / Sender Email
+              </label>
+              <input
+                type="email"
+                value={config.smtpUser}
+                onChange={(e) => setConfig({ ...config, smtpUser: e.target.value })}
+                className="w-full text-xs font-mono bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none focus:border-amber-400"
+                placeholder="e.g. saininternationallogistics@gmail.com"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center justify-between">
+                <span>SMTP Password / App Password</span>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-amber-400 hover:text-amber-300 text-[11px] flex items-center gap-1 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  <span>{showPassword ? 'Hide' : 'Show'}</span>
+                </button>
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={config.smtpPassword}
+                  onChange={(e) => setConfig({ ...config, smtpPassword: e.target.value })}
+                  className="w-full text-xs font-mono bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none focus:border-amber-400 pr-8"
+                  placeholder="Google 16-character App Password"
+                />
+                <Lock className="w-3.5 h-3.5 text-slate-500 absolute right-2.5 top-2.5" />
+              </div>
+              <span className="text-[10px] text-slate-400 mt-1 block">
+                For Gmail: Use a 16-character &quot;App Password&quot; from your Google Account Security settings.
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">
+                Recipient Email (Where to deliver inquiries)
+              </label>
+              <input
+                type="email"
+                value={config.receiverEmail}
+                onChange={(e) => setConfig({ ...config, receiverEmail: e.target.value })}
+                className="w-full text-xs font-mono bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none focus:border-amber-400"
+                placeholder="saininternationallogistics@gmail.com"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1">
+              Sender Display Name
+            </label>
+            <input
+              type="text"
+              value={config.senderName}
+              onChange={(e) => setConfig({ ...config, senderName: e.target.value })}
+              className="w-full text-xs bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none focus:border-amber-400"
+              placeholder="SAIN Logistics Web Desk"
+            />
+          </div>
+
+          {/* Test SMTP Button & Diagnostic Output */}
+          <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={handleTestSmtp}
+              disabled={testLoading}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl transition flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-md"
+            >
+              {testLoading ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                  <span>Connecting & Testing SMTP...</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Send Test Email via SMTP</span>
+                </>
+              )}
+            </button>
+
+            {testResult && (
+              <div
+                className={`text-xs px-3.5 py-2 rounded-xl flex items-center gap-2 max-w-md ${
+                  testResult.success
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                }`}
+              >
+                {testResult.success ? (
+                  <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                )}
+                <span>{testResult.message}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Save Bar */}
+        <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+          <p className="text-[11px] text-slate-400">
+            Saved contact details and map settings take effect across the website instantly.
+          </p>
+
           <button
             type="submit"
-            className="px-6 py-2.5 bg-[#1a6c7a] hover:bg-[#145561] text-white rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-md transition"
+            className="px-6 py-2.5 bg-[#009b4d] hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer"
           >
             <Save className="w-4 h-4" />
             <span>Save Contact Settings</span>
