@@ -119,8 +119,10 @@ export const Footer: React.FC = () => {
 
         {/* Bottom Bar */}
         <div className="pt-8 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
-          <div>
-            &copy; {new Date().getFullYear()} <strong>SAIN International Logistics</strong>. All rights reserved.
+          <div className="flex items-center gap-2">
+            <span>&copy; {new Date().getFullYear()} <strong>SAIN International Logistics</strong>. All rights reserved.</span>
+            <span>•</span>
+            <a href="/admin" className="hover:text-amber-400 transition">Staff Portal</a>
           </div>
 
           {/* Developed by ScaizLab (Supports ScaizLab logo auto-load when placed in assets) */}
