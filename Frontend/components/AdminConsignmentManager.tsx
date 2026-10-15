@@ -17,7 +17,7 @@ import { Consignment } from '../services/trackingData';
 export const AdminConsignmentManager: React.FC = () => {
   const { allConsignments, addConsignment, updateConsignment, openTrackingModal } = useTracking();
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedNo, setSelectedNo] = useState<string>('12345');
+  const [selectedNo, setSelectedNo] = useState<string>('SAINEX067638406');
   const [isCreatingNew, setIsCreatingNew] = useState(false);
 
   // Form states for creating new consignment
