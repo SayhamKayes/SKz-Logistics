@@ -16,6 +16,8 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { API_BASE_URL } from '../../services/databaseConfig';
+import { ConfirmModal } from './ConfirmModal';
+import { saveSiteConfigToDb } from '../../services/siteConfigService';
 
 export interface ContactConfig {
   // Header
@@ -102,12 +104,20 @@ export const ContactContentEditor: React.FC = () => {
       if (stored) {
         return { ...DEFAULT_CONTACT_CONFIG, ...JSON.parse(stored) };
       }
-    } catch {}
+    } catch { }
     return DEFAULT_CONTACT_CONFIG;
   });
 
   const [saved, setSaved] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    type?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  } | null>(null);
 
   // SMTP Test state
   const [testLoading, setTestLoading] = useState(false);
@@ -116,17 +126,27 @@ export const ContactContentEditor: React.FC = () => {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem('sain_contact_content_config', JSON.stringify(config));
+    saveSiteConfigToDb('sain_contact_content_config', config);
     window.dispatchEvent(new Event('sain_contact_content_updated'));
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
 
   const handleResetDefaults = () => {
-    if (window.confirm('Reset all contact and location settings to default?')) {
-      setConfig(DEFAULT_CONTACT_CONFIG);
-      localStorage.setItem('sain_contact_content_config', JSON.stringify(DEFAULT_CONTACT_CONFIG));
-      window.dispatchEvent(new Event('sain_contact_content_updated'));
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Reset Contact & Office Settings?',
+      message: 'Are you sure you want to reset all phone numbers, email addresses, office locations, and SMTP configurations back to defaults?',
+      confirmText: 'Reset to Defaults',
+      type: 'warning',
+      onConfirm: () => {
+        setConfig(DEFAULT_CONTACT_CONFIG);
+        localStorage.setItem('sain_contact_content_config', JSON.stringify(DEFAULT_CONTACT_CONFIG));
+        saveSiteConfigToDb('sain_contact_content_config', DEFAULT_CONTACT_CONFIG);
+        window.dispatchEvent(new Event('sain_contact_content_updated'));
+        setConfirmModal(null);
+      },
+    });
   };
 
   const handleTestSmtp = async () => {
@@ -196,6 +216,16 @@ export const ContactContentEditor: React.FC = () => {
               <span>Saved & Live on Website</span>
             </span>
           )}
+          <a
+            href="/contact"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-bold px-3 py-1.5 border border-[#1a6c7a]/30 text-[#1a6c7a] bg-[#1a6c7a]/5 hover:bg-[#1a6c7a]/15 rounded-lg transition inline-flex items-center gap-1.5 cursor-pointer"
+            title="Open Live Contact Page in a new tab"
+          >
+            <span>View Live Contact</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
           <button
             type="button"
             onClick={handleResetDefaults}
@@ -265,7 +295,6 @@ export const ContactContentEditor: React.FC = () => {
         {/* ============================================================== */}
         <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4">
           <h4 className="text-xs font-bold uppercase tracking-wider text-[#1a6c7a] border-b border-slate-200 pb-2 flex items-center gap-2">
-            <Phone className="w-4 h-4 text-amber-500" />
             <span>2. Direct Phone Numbers</span>
           </h4>
 
@@ -347,7 +376,6 @@ export const ContactContentEditor: React.FC = () => {
           {/* Email Settings */}
           <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4">
             <h4 className="text-xs font-bold uppercase tracking-wider text-[#1a6c7a] border-b border-slate-200 pb-2 flex items-center gap-2">
-              <Mail className="w-4 h-4 text-amber-500" />
               <span>3. Electronic Mail Info</span>
             </h4>
 
@@ -397,7 +425,6 @@ export const ContactContentEditor: React.FC = () => {
           {/* Headquarters & Hours */}
           <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4">
             <h4 className="text-xs font-bold uppercase tracking-wider text-[#1a6c7a] border-b border-slate-200 pb-2 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-amber-500" />
               <span>4. Headquarters & Hours</span>
             </h4>
 
@@ -483,7 +510,6 @@ export const ContactContentEditor: React.FC = () => {
         <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-200 pb-2">
             <h4 className="text-xs font-bold uppercase tracking-wider text-[#1a6c7a] flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-rose-500" />
               <span>5. Google Map Location (Contact Page)</span>
             </h4>
             <span className="text-[10px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-bold">
@@ -706,11 +732,10 @@ export const ContactContentEditor: React.FC = () => {
 
             {testResult && (
               <div
-                className={`text-xs px-3.5 py-2 rounded-xl flex items-center gap-2 max-w-md ${
-                  testResult.success
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                }`}
+                className={`text-xs px-3.5 py-2 rounded-xl flex items-center gap-2 max-w-md ${testResult.success
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                  }`}
               >
                 {testResult.success ? (
                   <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
@@ -738,6 +763,19 @@ export const ContactContentEditor: React.FC = () => {
           </button>
         </div>
       </form>
+
+      {/* Custom Confirm Modal replacing window.confirm */}
+      {confirmModal && (
+        <ConfirmModal
+          isOpen={confirmModal.isOpen}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          confirmText={confirmModal.confirmText}
+          type={confirmModal.type}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
+      )}
     </div>
   );
 };
