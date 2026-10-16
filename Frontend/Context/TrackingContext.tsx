@@ -432,6 +432,30 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const openQuoteModal = () => setIsQuoteModalOpen(true);
   const closeQuoteModal = () => setIsQuoteModalOpen(false);
 
+  // Auto-detect and open tracking modal from URL query parameters (e.g. /?track=SAINEX067638406)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const trackCode =
+      urlParams.get('track') ||
+      urlParams.get('consignment') ||
+      urlParams.get('no') ||
+      urlParams.get('awb');
+
+    if (trackCode && trackCode.trim()) {
+      const cleanCode = trackCode.trim().toUpperCase();
+      const timer = setTimeout(async () => {
+        try {
+          await searchConsignment(cleanCode);
+          openTrackingModal(cleanCode);
+        } catch {
+          openTrackingModal(cleanCode);
+        }
+      }, 250);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   // Sync updates with Django REST Framework backend
   const syncWithBackend = async (consignment: Consignment) => {
     try {
