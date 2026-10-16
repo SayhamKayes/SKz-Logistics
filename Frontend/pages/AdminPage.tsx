@@ -8,6 +8,7 @@ import { HomeContentEditor } from '../components/admin/HomeContentEditor';
 import { AboutContentEditor } from '../components/admin/AboutContentEditor';
 import { ServicesContentEditor } from '../components/admin/ServicesContentEditor';
 import { ContactContentEditor } from '../components/admin/ContactContentEditor';
+import { FooterContentEditor } from '../components/admin/FooterContentEditor';
 import { AdminProfileEditor } from '../components/admin/AdminProfileEditor';
 import {
   ExternalLink,
@@ -187,7 +188,9 @@ export const AdminPage: React.FC = () => {
                           ? 'Services Catalog'
                           : currentSection === 'contact'
                             ? 'Contact & Branches'
-                            : 'Admin Profile'}
+                            : currentSection === 'footer'
+                              ? 'Footer Section'
+                              : 'Admin Profile'}
                 </span>
               </div>
               <h1 className="text-base font-bold text-slate-900 leading-tight">
@@ -231,6 +234,7 @@ export const AdminPage: React.FC = () => {
           {currentSection === 'about' && <AboutContentEditor />}
           {currentSection === 'services' && <ServicesContentEditor />}
           {currentSection === 'contact' && <ContactContentEditor />}
+          {currentSection === 'footer' && <FooterContentEditor />}
           {currentSection === 'profile' && (
             <AdminProfileEditor onProfileUpdated={handleProfileUpdated} />
           )}
