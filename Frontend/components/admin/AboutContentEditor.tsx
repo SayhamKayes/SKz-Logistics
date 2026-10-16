@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Save, CheckCircle, Info, Upload, Trash2, RotateCcw, Target, Compass, Award, TrendingUp, ShieldCheck } from 'lucide-react';
+import { Save, CheckCircle, Info, Upload, Trash2, RotateCcw, Target, Compass, Award, TrendingUp, ShieldCheck, ExternalLink } from 'lucide-react';
+import { ConfirmModal } from './ConfirmModal';
+import { saveSiteConfigToDb } from '../../services/siteConfigService';
 
 export interface AboutConfig {
   badge: string;
@@ -63,6 +65,14 @@ export const AboutContentEditor: React.FC = () => {
   });
 
   const [saved, setSaved] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    type?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  } | null>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -83,9 +93,17 @@ export const AboutContentEditor: React.FC = () => {
   };
 
   const handleDeleteImage = () => {
-    if (window.confirm('Delete the showcase image? The section will display a clean layout without the image.')) {
-      setConfig((prev) => ({ ...prev, image: '' }));
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Showcase Image?',
+      message: 'Are you sure you want to delete the showcase image? The section will display a clean layout without the image.',
+      confirmText: 'Delete Image',
+      type: 'danger',
+      onConfirm: () => {
+        setConfig((prev) => ({ ...prev, image: '' }));
+        setConfirmModal(null);
+      },
+    });
   };
 
   const handleResetImage = () => {
@@ -95,17 +113,27 @@ export const AboutContentEditor: React.FC = () => {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem('sain_about_content_config', JSON.stringify(config));
+    saveSiteConfigToDb('sain_about_content_config', config);
     window.dispatchEvent(new Event('sain_about_content_updated'));
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
 
   const handleResetDefaults = () => {
-    if (window.confirm('Reset all About Us content to defaults?')) {
-      setConfig(DEFAULT_ABOUT_CONFIG);
-      localStorage.setItem('sain_about_content_config', JSON.stringify(DEFAULT_ABOUT_CONFIG));
-      window.dispatchEvent(new Event('sain_about_content_updated'));
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Reset About Us Content?',
+      message: 'Are you sure you want to reset all About Us text, images, mission, vision, and values back to defaults?',
+      confirmText: 'Reset to Defaults',
+      type: 'warning',
+      onConfirm: () => {
+        setConfig(DEFAULT_ABOUT_CONFIG);
+        localStorage.setItem('sain_about_content_config', JSON.stringify(DEFAULT_ABOUT_CONFIG));
+        saveSiteConfigToDb('sain_about_content_config', DEFAULT_ABOUT_CONFIG);
+        window.dispatchEvent(new Event('sain_about_content_updated'));
+        setConfirmModal(null);
+      },
+    });
   };
 
   return (
@@ -128,6 +156,16 @@ export const AboutContentEditor: React.FC = () => {
               <span>Saved & Updated Live</span>
             </span>
           )}
+          <a
+            href="/about"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-bold px-3 py-1.5 border border-[#1a6c7a]/30 text-[#1a6c7a] bg-[#1a6c7a]/5 hover:bg-[#1a6c7a]/15 rounded-lg transition inline-flex items-center gap-1.5 cursor-pointer"
+            title="Open Live About Us page in a new tab"
+          >
+            <span>View Live About Us</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
           <button
             type="button"
             onClick={handleResetDefaults}
@@ -305,7 +343,6 @@ export const AboutContentEditor: React.FC = () => {
         {/* Section 3: Mission & Vision */}
         <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4">
           <h4 className="text-xs font-bold uppercase tracking-wider text-[#1a6c7a] border-b border-slate-200 pb-2 flex items-center gap-2">
-            <Target className="w-4 h-4 text-amber-500" />
             <span>3. Mission & Vision Statements</span>
           </h4>
 
@@ -369,7 +406,6 @@ export const AboutContentEditor: React.FC = () => {
         {/* Section 4: 3 Core Values */}
         <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4">
           <h4 className="text-xs font-bold uppercase tracking-wider text-[#1a6c7a] border-b border-slate-200 pb-2 flex items-center gap-2">
-            <Award className="w-4 h-4 text-emerald-600" />
             <span>4. Core Values (3 Cards)</span>
           </h4>
 
@@ -511,6 +547,19 @@ export const AboutContentEditor: React.FC = () => {
           </button>
         </div>
       </form>
+
+      {/* Custom Confirm Modal replacing window.confirm */}
+      {confirmModal && (
+        <ConfirmModal
+          isOpen={confirmModal.isOpen}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          confirmText={confirmModal.confirmText}
+          type={confirmModal.type}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
+      )}
     </div>
   );
 };
