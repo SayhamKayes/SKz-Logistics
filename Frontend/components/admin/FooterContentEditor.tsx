@@ -14,7 +14,12 @@ import {
   Globe,
   Upload,
   Image as ImageIcon,
+  ExternalLink,
 } from 'lucide-react';
+import { ConfirmModal } from './ConfirmModal';
+import { saveSiteConfigToDb } from '../../services/siteConfigService';
+import { RichParagraphEditor } from './RichParagraphEditor';
+import { sanitizeRichHtml } from '../../utils/sanitizeHtml';
 
 export interface FooterConfig {
   brandLogoUrl: string;
@@ -93,6 +98,14 @@ export const FooterContentEditor: React.FC = () => {
 
   const [saved, setSaved] = useState(false);
   const [newServiceInput, setNewServiceInput] = useState('');
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    type?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  } | null>(null);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -144,17 +157,27 @@ export const FooterContentEditor: React.FC = () => {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem(FOOTER_STORAGE_KEY, JSON.stringify(config));
+    saveSiteConfigToDb(FOOTER_STORAGE_KEY, config);
     window.dispatchEvent(new Event(FOOTER_UPDATE_EVENT));
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
 
   const handleResetDefaults = () => {
-    if (window.confirm('Are you sure you want to reset all Footer content back to default values?')) {
-      setConfig(DEFAULT_FOOTER_CONFIG);
-      localStorage.setItem(FOOTER_STORAGE_KEY, JSON.stringify(DEFAULT_FOOTER_CONFIG));
-      window.dispatchEvent(new Event(FOOTER_UPDATE_EVENT));
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Reset Footer Settings to Default?',
+      message: 'Are you sure you want to reset all footer brand narrative, copyright text, contact details, services list, and legal links to default values?',
+      confirmText: 'Reset to Defaults',
+      type: 'warning',
+      onConfirm: () => {
+        setConfig(DEFAULT_FOOTER_CONFIG);
+        localStorage.setItem(FOOTER_STORAGE_KEY, JSON.stringify(DEFAULT_FOOTER_CONFIG));
+        saveSiteConfigToDb(FOOTER_STORAGE_KEY, DEFAULT_FOOTER_CONFIG);
+        window.dispatchEvent(new Event(FOOTER_UPDATE_EVENT));
+        setConfirmModal(null);
+      },
+    });
   };
 
   return (
@@ -172,6 +195,17 @@ export const FooterContentEditor: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <a
+            href="/#footer"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3.5 py-2 border border-[#1a6c7a]/30 text-[#1a6c7a] bg-[#1a6c7a]/5 hover:bg-[#1a6c7a]/15 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+            title="Preview live footer on website in a new tab"
+          >
+            <span>View Live Footer</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+
           <button
             type="button"
             onClick={handleResetDefaults}
@@ -204,7 +238,6 @@ export const FooterContentEditor: React.FC = () => {
         {/* Section 1: Brand & Overview */}
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700 pb-1 border-b border-slate-100">
-            <Sparkles className="w-4 h-4 text-amber-500" />
             <span>1. Brand Identity & Description</span>
           </div>
 
@@ -245,19 +278,16 @@ export const FooterContentEditor: React.FC = () => {
               </div>
             </div>
 
-            {/* Description Textarea */}
-            <div className="md:col-span-2 space-y-3">
-              <label className="block text-xs font-semibold text-slate-700">
-                Company Description / Overview Paragraph
-              </label>
-              <textarea
-                rows={4}
+            {/* Description Rich Paragraph Editor */}
+            <div className="md:col-span-2">
+              <RichParagraphEditor
                 value={config.brandDescription}
-                onChange={(e) => setConfig({ ...config, brandDescription: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-900 focus:bg-white focus:border-[#1a6c7a] outline-none transition leading-relaxed"
-                placeholder="Enter company description displayed under the logo..."
+                onChange={(newVal) => setConfig({ ...config, brandDescription: newVal })}
+                label="Company Description / Overview Paragraph"
+                placeholder="Enter company description displayed beneath the logo..."
+                helperText="Select any portion of text and click Bold (Ctrl+B), Italic (Ctrl+I), or Underline (Ctrl+U) to style it just like Microsoft Word."
               />
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-slate-500 mt-2">
                 This appears beneath the SAIN logo on the left side of the footer.
               </p>
             </div>
@@ -267,7 +297,6 @@ export const FooterContentEditor: React.FC = () => {
         {/* Section 2: Quick Navigation Column */}
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700 pb-1 border-b border-slate-100">
-            <Globe className="w-4 h-4 text-[#1a6c7a]" />
             <span>2. Quick Navigation Column</span>
           </div>
 
@@ -324,7 +353,6 @@ export const FooterContentEditor: React.FC = () => {
         <div className="space-y-4">
           <div className="flex items-center justify-between pb-1 border-b border-slate-100">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
-              <LayoutTemplate className="w-4 h-4 text-emerald-600" />
               <span>3. Services List Column</span>
             </div>
             <span className="text-xs text-slate-500 font-medium">
@@ -396,7 +424,6 @@ export const FooterContentEditor: React.FC = () => {
         {/* Section 4: Headquarters Column */}
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700 pb-1 border-b border-slate-100">
-            <MapPin className="w-4 h-4 text-amber-500" />
             <span>4. Headquarters & Contact Details</span>
           </div>
 
@@ -487,9 +514,10 @@ export const FooterContentEditor: React.FC = () => {
                     className="h-8 w-auto object-contain"
                   />
                 )}
-                <p className="text-slate-400 text-xs leading-relaxed max-w-sm">
-                  {config.brandDescription}
-                </p>
+                <div
+                  className="text-slate-400 text-xs leading-relaxed max-w-sm rich-footer-text"
+                  dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(config.brandDescription) }}
+                />
               </div>
 
               {/* Navigation Preview */}
@@ -585,6 +613,19 @@ export const FooterContentEditor: React.FC = () => {
           </button>
         </div>
       </form>
+
+      {/* Custom Confirm Modal replacing window.confirm */}
+      {confirmModal && (
+        <ConfirmModal
+          isOpen={confirmModal.isOpen}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          confirmText={confirmModal.confirmText}
+          type={confirmModal.type}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
+      )}
     </div>
   );
 };
