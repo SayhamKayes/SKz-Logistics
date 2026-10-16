@@ -27,8 +27,10 @@ import {
   Check,
 } from 'lucide-react';
 import { getStatusProgressAndColor, buildConsignmentTimeline } from '../services/trackingData';
+import { useWhatsAppConfig } from '../hooks/useWhatsApp';
 
 export const TrackingModal: React.FC = () => {
+  const { phoneNumber } = useWhatsAppConfig();
   const {
     isTrackingModalOpen,
     closeTrackingModal,
@@ -590,7 +592,7 @@ export const TrackingModal: React.FC = () => {
                   <span>Print Waybill</span>
                 </button>
                 <a
-                  href={`https://wa.me/8801719068999?text=Hello%20SAIN%20Logistics,%20I%20am%20inquiring%20about%20my%20consignment%20${activeConsignment.consignmentNo}`}
+                  href={`https://wa.me/${phoneNumber}?text=Hello%20SAIN%20Logistics,%20I%20am%20inquiring%20about%20my%20consignment%20${activeConsignment.consignmentNo}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition flex items-center gap-1.5"
