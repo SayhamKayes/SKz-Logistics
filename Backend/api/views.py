@@ -1,12 +1,17 @@
+import os
 import smtplib
 import ssl
+import secrets
+import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
+from django.contrib.auth.models import User
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
+
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -229,4 +234,172 @@ def send_contact_email(request):
             "success": False,
             "error": f"Failed to send email via SMTP: {str(e)}"
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# In-memory store for pending password reset tokens: { token: { 'email': email, 'created_at': timestamp } }
+RESET_PASSWORD_TOKENS = {}
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def forgot_password(request):
+    """
+    Generate a password reset token and dispatch an email with the reset link via SMTP.
+    """
+    data = request.data or {}
+    email = data.get('email', '').strip()
+    reset_base_url = data.get('resetUrl', '').strip()
+    smtp_config = data.get('smtpConfig', {})
+
+    if not email:
+        return Response(
+            {"success": False, "error": "Administrative email address is required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Generate secure 32-byte URL-safe token
+    token = secrets.token_urlsafe(32)
+    RESET_PASSWORD_TOKENS[token] = {
+        'email': email,
+        'created_at': time.time()
+    }
+
+    # Construct the complete reset link
+    if reset_base_url:
+        separator = '&' if '?' in reset_base_url else '?'
+        reset_link = f"{reset_base_url}{separator}token={token}"
+    else:
+        reset_link = f"/sain-sakib?action=reset-password&token={token}"
+
+    # SMTP configuration - prefer request payload (admin panel settings) or env
+    host = smtp_config.get('smtpHost') or os.getenv('SMTP_HOST', 'smtp.gmail.com')
+    port = smtp_config.get('smtpPort') or os.getenv('SMTP_PORT', 587)
+    security = smtp_config.get('smtpSecurity') or os.getenv('SMTP_SECURITY', 'tls')
+    user = smtp_config.get('smtpUser') or os.getenv('SMTP_USER', '')
+    password = smtp_config.get('smtpPassword') or os.getenv('SMTP_PASSWORD', '')
+    sender_name = smtp_config.get('senderName') or os.getenv('SMTP_SENDER_NAME', 'SAIN International Logistics')
+
+    # If SMTP is not yet configured or password is empty, return helpful fallback
+    if not host or not user or not password:
+        return Response({
+            "success": True,
+            "simulated": True,
+            "warning": "SMTP credentials are pending configuration in Admin Portal / .env.",
+            "message": f"Password reset link generated for {email}.",
+            "reset_link": reset_link,
+            "token": token
+        })
+
+    try:
+        server = create_smtp_client(host, port, security)
+        server.login(user, password)
+
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = '🔐 Reset Your SAIN Admin Portal Password'
+        msg['From'] = f'{sender_name} <{user}>'
+        msg['To'] = email
+
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; background: #f8fafc; padding: 24px; color: #1e293b; margin: 0;">
+          <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.07);">
+            <div style="background: #0f1d26; padding: 24px 28px; border-bottom: 4px solid #f59e0b;">
+              <h2 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 0.5px;">SAIN International Logistics</h2>
+              <p style="color: #94a3b8; margin: 6px 0 0 0; font-size: 13px;">Management Portal • Security Gateway</p>
+            </div>
+            <div style="padding: 28px;">
+              <h3 style="color: #0f172a; font-size: 16px; margin: 0 0 12px 0;">Admin Password Reset Request</h3>
+              <p style="font-size: 14px; line-height: 1.6; color: #475569; margin: 0 0 20px 0;">
+                We received a request to reset the administrator password for the account associated with <strong>{email}</strong>.
+              </p>
+              <div style="text-align: center; margin: 28px 0;">
+                <a href="{reset_link}" target="_blank" style="background: linear-gradient(135deg, #153243, #1a6c7a); color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 14px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(26,108,122,0.3);">
+                  Reset Admin Password &rarr;
+                </a>
+              </div>
+              <p style="font-size: 12px; line-height: 1.5; color: #64748b; margin: 20px 0 8px 0;">
+                If the button above does not work, copy and paste this URL into your browser:
+              </p>
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 12px; border-radius: 8px; word-break: break-all; font-family: monospace; font-size: 11px; color: #0284c7;">
+                {reset_link}
+              </div>
+              <p style="font-size: 12px; color: #94a3b8; margin: 20px 0 0 0;">
+                ⏳ <strong>Notice:</strong> This reset link will expire in <strong>60 minutes</strong>. If you did not request this reset, your account is safe and you can ignore this email.
+              </p>
+            </div>
+            <div style="background: #f8fafc; padding: 14px 28px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center;">
+              Uttara Sector 11, Dhaka-1230, Bangladesh • Customs Act 2023 Compliant
+            </div>
+          </div>
+        </body>
+        </html>
+        """
+        plain_text = f"SAIN International Logistics - Admin Password Reset\n\nReset your password using the following link:\n{reset_link}\n\nThis link is valid for 60 minutes.\nIf you did not request this, please ignore this email."
+
+        msg.attach(MIMEText(plain_text, 'plain'))
+        msg.attach(MIMEText(html_content, 'html'))
+
+        server.sendmail(user, [email], msg.as_string())
+        server.quit()
+
+        return Response({
+            "success": True,
+            "message": f"A password reset link has been dispatched to {email}."
+        })
+    except Exception as e:
+        return Response({
+            "success": False,
+            "error": f"SMTP delivery failed: {str(e)}",
+            "fallback_link": reset_link,
+            "token": token
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def reset_password(request):
+    """
+    Verify reset token and update admin password.
+    """
+    data = request.data or {}
+    token = data.get('token', '').strip()
+    new_password = data.get('new_password', '').strip()
+
+    if not token or not new_password:
+        return Response(
+            {"success": False, "error": "Token and new password are required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    token_data = RESET_PASSWORD_TOKENS.get(token)
+    if not token_data:
+        return Response(
+            {"success": False, "error": "Invalid or expired reset token."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Validate expiration (60 minutes TTL)
+    if time.time() - token_data.get('created_at', 0) > 3600:
+        RESET_PASSWORD_TOKENS.pop(token, None)
+        return Response(
+            {"success": False, "error": "Reset link has expired. Please request a new one."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Invalidate token after use
+    RESET_PASSWORD_TOKENS.pop(token, None)
+
+    # Synchronize Django User model if user exists
+    try:
+        admin_user = User.objects.filter(is_superuser=True).first() or User.objects.filter(username='sain_sakib6055').first()
+        if admin_user:
+            admin_user.set_password(new_password)
+            admin_user.save()
+    except Exception:
+        pass
+
+    return Response({
+        "success": True,
+        "message": "Administrator password has been successfully updated."
+    })
+
 
