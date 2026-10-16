@@ -11,9 +11,10 @@ import {
   ExternalLink,
   ShieldCheck,
   ChevronRight,
+  PanelBottom,
 } from 'lucide-react';
 
-export type AdminSection = 'shipments' | 'home' | 'about' | 'services' | 'contact' | 'profile';
+export type AdminSection = 'shipments' | 'home' | 'about' | 'services' | 'contact' | 'footer' | 'profile';
 
 interface AdminSidebarProps {
   currentSection: AdminSection;
@@ -36,6 +37,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     { id: 'about', label: 'About Us Section', icon: Info },
     { id: 'services', label: 'Services Catalog', icon: Truck },
     { id: 'contact', label: 'Contact & Branches', icon: Phone },
+    { id: 'footer', label: 'Footer Section', icon: PanelBottom },
     { id: 'profile', label: 'Admin Profile & Security', icon: User },
   ];
 
