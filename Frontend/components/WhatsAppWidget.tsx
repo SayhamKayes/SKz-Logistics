@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
+import { useWhatsAppConfig } from '../hooks/useWhatsApp';
 
 export const WhatsAppWidget: React.FC = () => {
   const [isHovered, setIsHovered] = useState(false);
+  const { phoneNumber, defaultMessage } = useWhatsAppConfig();
 
-  // Official SAIN International Logistics WhatsApp contact number
-  const phoneNumber = '8801719068999';
-  const defaultMessage = encodeURIComponent(
-    'Hello SAIN International Logistics, I would like to inquire about freight & shipping services.'
-  );
-  const whatsappUrl = `https://wa.me/${phoneNumber}?text=${defaultMessage}`;
+  const encodedMessage = encodeURIComponent(defaultMessage);
+  const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
 
   return (
     <div
