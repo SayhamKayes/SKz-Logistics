@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { TrackingProvider, useTracking } from './Context/TrackingContext';
 import { MainLayout } from './Layouts/MainLayout';
 import { HomePage } from './pages/HomePage';
@@ -7,13 +7,24 @@ import { ServicesPage } from './pages/ServicesPage';
 import { ContactPage } from './pages/ContactPage';
 import { TrackPage } from './pages/TrackPage';
 import { AdminPage } from './pages/AdminPage';
+import { TrackingModal } from './components/TrackingModal';
+import { syncAllSiteConfigsFromDb } from './services/siteConfigService';
 
 const AppContent: React.FC = () => {
   const { activeTab } = useTracking();
 
+  useEffect(() => {
+    syncAllSiteConfigsFromDb();
+  }, []);
+
   // Standalone Admin Portal (Full screen, login-gated, independent from public layout)
   if (activeTab === 'admin') {
-    return <AdminPage />;
+    return (
+      <>
+        <AdminPage />
+        <TrackingModal />
+      </>
+    );
   }
 
   return (
