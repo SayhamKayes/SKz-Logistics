@@ -13,8 +13,10 @@ import {
   PhoneCall,
   Sparkles,
 } from 'lucide-react';
+import { useWhatsAppConfig } from '../hooks/useWhatsApp';
 
 export const QuoteCalculatorModal: React.FC = () => {
+  const { phoneNumber } = useWhatsAppConfig();
   const { isQuoteModalOpen, closeQuoteModal } = useTracking();
 
   const [freightType, setFreightType] = useState<'air' | 'sea_lcl' | 'sea_fcl' | 'hand_carry'>('air');
@@ -212,21 +214,21 @@ export const QuoteCalculatorModal: React.FC = () => {
           {/* CTAs */}
           <div className="pt-2 flex flex-wrap items-center justify-between gap-3">
             <a
-              href={`https://wa.me/8801719068999?text=Hello%20SAIN%20Logistics,%20I%20would%20like%20to%20book%20a%20shipment%20from%20${origin}%20to%20${destination}%20with%20weight%20${weightKg}kg.`}
+              href={`https://wa.me/${phoneNumber}?text=Hello%20SAIN%20Logistics,%20I%20would%20like%20to%20book%20a%20shipment%20from%20${origin}%20to%20${destination}%20with%20weight%20${weightKg}kg.`}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
             >
               <span>Book via WhatsApp</span>
               <ArrowRight className="w-4 h-4" />
             </a>
 
             <a
-              href="tel:+8801719068999"
-              className="w-full sm:w-auto px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs uppercase tracking-wider rounded-xl border border-slate-700 transition flex items-center justify-center gap-2"
+              href={`tel:+${phoneNumber}`}
+              className="w-full sm:w-auto px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs uppercase tracking-wider rounded-xl border border-slate-700 transition flex items-center justify-center gap-2 cursor-pointer"
             >
               <PhoneCall className="w-4 h-4 text-amber-500" />
-              <span>Call (880) 1719 068999</span>
+              <span>Call (+{phoneNumber})</span>
             </a>
           </div>
         </div>
