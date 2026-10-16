@@ -1,0 +1,590 @@
+import React, { useState } from 'react';
+import {
+  Save,
+  CheckCircle,
+  Sparkles,
+  RotateCcw,
+  Plus,
+  Trash2,
+  MapPin,
+  Phone,
+  Mail,
+  Clock,
+  LayoutTemplate,
+  Globe,
+  Upload,
+  Image as ImageIcon,
+} from 'lucide-react';
+
+export interface FooterConfig {
+  brandLogoUrl: string;
+  brandDescription: string;
+
+  navHeading: string;
+  navHomeLabel: string;
+  navAboutLabel: string;
+  navServicesLabel: string;
+  navContactLabel: string;
+
+  servicesHeading: string;
+  servicesList: string[];
+
+  hqHeading: string;
+  address: string;
+  phone: string;
+  email: string;
+  workingHours: string;
+
+  copyrightBrand: string;
+  copyrightSuffix: string;
+  creditPrefix: string;
+  creditDevName: string;
+  creditDevUrl: string;
+}
+
+export const DEFAULT_FOOTER_CONFIG: FooterConfig = {
+  brandLogoUrl: '/assets/images/SAIN_logo_gold.png',
+  brandDescription:
+    'SAIN is a trusted international freight and courier partner connecting people and businesses with fast, secure, and reliable shipping services from Guangzhou and global hubs to Bangladesh.',
+
+  navHeading: 'Navigation',
+  navHomeLabel: 'Home',
+  navAboutLabel: 'About Us',
+  navServicesLabel: 'Freight Services',
+  navContactLabel: 'Contact Us',
+
+  servicesHeading: 'Services',
+  servicesList: [
+    'Air Freight (Guangzhou to Dhaka)',
+    'Sea Freight (FCL / LCL Container Cargo)',
+    'Hand Carry Express Courier',
+    'Outbound Export Forwarding',
+    'Customs House Clearance (CFR / CIF)',
+  ],
+
+  hqHeading: 'Headquarters',
+  address: 'Sector 3, Uttara, Dhaka-1230, Bangladesh',
+  phone: '(880) 1719 068999',
+  email: 'saininternationallogistics@gmail.com',
+  workingHours: 'Sat – Thu: 10am – 9pm',
+
+  copyrightBrand: 'SAIN International Logistics',
+  copyrightSuffix: 'All rights reserved.',
+  creditPrefix: 'Designed & Developed by',
+  creditDevName: 'SKzLAB',
+  creditDevUrl: 'https://theskzlab.com',
+};
+
+export const FOOTER_STORAGE_KEY = 'sain_footer_content_config';
+export const FOOTER_UPDATE_EVENT = 'sain_footer_content_updated';
+
+export const FooterContentEditor: React.FC = () => {
+  const [config, setConfig] = useState<FooterConfig>(() => {
+    try {
+      const stored = localStorage.getItem(FOOTER_STORAGE_KEY);
+      if (stored) {
+        return { ...DEFAULT_FOOTER_CONFIG, ...JSON.parse(stored) };
+      }
+    } catch {
+      // ignore
+    }
+    return DEFAULT_FOOTER_CONFIG;
+  });
+
+  const [saved, setSaved] = useState(false);
+  const [newServiceInput, setNewServiceInput] = useState('');
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Logo file size must be under 2MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setConfig((prev) => ({ ...prev, brandLogoUrl: reader.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleResetLogo = () => {
+    setConfig((prev) => ({ ...prev, brandLogoUrl: DEFAULT_FOOTER_CONFIG.brandLogoUrl }));
+  };
+
+  const handleAddService = () => {
+    const trimmed = newServiceInput.trim();
+    if (!trimmed) return;
+    setConfig((prev) => ({
+      ...prev,
+      servicesList: [...prev.servicesList, trimmed],
+    }));
+    setNewServiceInput('');
+  };
+
+  const handleRemoveService = (index: number) => {
+    setConfig((prev) => ({
+      ...prev,
+      servicesList: prev.servicesList.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleServiceChange = (index: number, value: string) => {
+    setConfig((prev) => {
+      const updated = [...prev.servicesList];
+      updated[index] = value;
+      return { ...prev, servicesList: updated };
+    });
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    localStorage.setItem(FOOTER_STORAGE_KEY, JSON.stringify(config));
+    window.dispatchEvent(new Event(FOOTER_UPDATE_EVENT));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  };
+
+  const handleResetDefaults = () => {
+    if (window.confirm('Are you sure you want to reset all Footer content back to default values?')) {
+      setConfig(DEFAULT_FOOTER_CONFIG);
+      localStorage.setItem(FOOTER_STORAGE_KEY, JSON.stringify(DEFAULT_FOOTER_CONFIG));
+      window.dispatchEvent(new Event(FOOTER_UPDATE_EVENT));
+    }
+  };
+
+  return (
+    <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xs space-y-8">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-5 gap-4">
+        <div>
+          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <LayoutTemplate className="w-5 h-5 text-amber-500" />
+            <span>Footer Section Settings</span>
+          </h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Manage company introduction, quick navigation titles, services catalog links, and headquarters contact details.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={handleResetDefaults}
+            className="px-3.5 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+            <span>Reset Defaults</span>
+          </button>
+
+          <button
+            onClick={handleSave}
+            className="px-4 py-2 bg-[#1a6c7a] hover:bg-[#153243] text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg flex items-center gap-2 transition cursor-pointer"
+          >
+            {saved ? (
+              <>
+                <CheckCircle className="w-4 h-4 text-emerald-300" />
+                <span>Saved Live!</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 text-amber-400" />
+                <span>Save Changes</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <form onSubmit={handleSave} className="space-y-8">
+        {/* Section 1: Brand & Overview */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700 pb-1 border-b border-slate-100">
+            <Sparkles className="w-4 h-4 text-amber-500" />
+            <span>1. Brand Identity & Description</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Logo Preview & Upload */}
+            <div className="space-y-3">
+              <label className="block text-xs font-semibold text-slate-700">Footer Logo</label>
+              <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 flex flex-col items-center justify-center gap-3 min-h-[120px]">
+                {config.brandLogoUrl ? (
+                  <img
+                    src={config.brandLogoUrl}
+                    alt="Footer Logo Preview"
+                    className="h-10 w-auto object-contain drop-shadow-md"
+                  />
+                ) : (
+                  <span className="text-xs text-slate-400">No Logo</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="flex-1 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload Logo</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={handleResetLogo}
+                  className="py-2 px-3 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg text-xs transition cursor-pointer"
+                  title="Reset to default gold logo"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Description Textarea */}
+            <div className="md:col-span-2 space-y-3">
+              <label className="block text-xs font-semibold text-slate-700">
+                Company Description / Overview Paragraph
+              </label>
+              <textarea
+                rows={4}
+                value={config.brandDescription}
+                onChange={(e) => setConfig({ ...config, brandDescription: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-900 focus:bg-white focus:border-[#1a6c7a] outline-none transition leading-relaxed"
+                placeholder="Enter company description displayed under the logo..."
+              />
+              <p className="text-[11px] text-slate-500">
+                This appears beneath the SAIN logo on the left side of the footer.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 2: Quick Navigation Column */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700 pb-1 border-b border-slate-100">
+            <Globe className="w-4 h-4 text-[#1a6c7a]" />
+            <span>2. Quick Navigation Column</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700">Column Title</label>
+              <input
+                type="text"
+                value={config.navHeading}
+                onChange={(e) => setConfig({ ...config, navHeading: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-[#1a6c7a] outline-none transition"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700">Home Label</label>
+              <input
+                type="text"
+                value={config.navHomeLabel}
+                onChange={(e) => setConfig({ ...config, navHomeLabel: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-[#1a6c7a] outline-none transition"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700">About Label</label>
+              <input
+                type="text"
+                value={config.navAboutLabel}
+                onChange={(e) => setConfig({ ...config, navAboutLabel: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-[#1a6c7a] outline-none transition"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700">Services Label</label>
+              <input
+                type="text"
+                value={config.navServicesLabel}
+                onChange={(e) => setConfig({ ...config, navServicesLabel: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-[#1a6c7a] outline-none transition"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700">Contact Label</label>
+              <input
+                type="text"
+                value={config.navContactLabel}
+                onChange={(e) => setConfig({ ...config, navContactLabel: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-[#1a6c7a] outline-none transition"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Section 3: Services Column */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+              <LayoutTemplate className="w-4 h-4 text-emerald-600" />
+              <span>3. Services List Column</span>
+            </div>
+            <span className="text-xs text-slate-500 font-medium">
+              {config.servicesList.length} services listed
+            </span>
+          </div>
+
+          <div className="max-w-md space-y-1.5">
+            <label className="block text-xs font-semibold text-slate-700">Column Title</label>
+            <input
+              type="text"
+              value={config.servicesHeading}
+              onChange={(e) => setConfig({ ...config, servicesHeading: e.target.value })}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-[#1a6c7a] outline-none transition"
+            />
+          </div>
+
+          {/* List of services items */}
+          <div className="space-y-2.5">
+            {config.servicesList.map((service, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <span className="w-6 text-center text-xs font-mono text-slate-400">
+                  {index + 1}.
+                </span>
+                <input
+                  type="text"
+                  value={service}
+                  onChange={(e) => handleServiceChange(index, e.target.value)}
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-[#1a6c7a] outline-none transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleRemoveService(index)}
+                  className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                  title="Remove this service"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Add new service */}
+          <div className="flex items-center gap-2 pt-2">
+            <input
+              type="text"
+              value={newServiceInput}
+              onChange={(e) => setNewServiceInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddService();
+                }
+              }}
+              placeholder="e.g. Warehousing & Distribution"
+              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-[#1a6c7a] outline-none transition"
+            />
+            <button
+              type="button"
+              onClick={handleAddService}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Service</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Section 4: Headquarters Column */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700 pb-1 border-b border-slate-100">
+            <MapPin className="w-4 h-4 text-amber-500" />
+            <span>4. Headquarters & Contact Details</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700">Column Title</label>
+              <input
+                type="text"
+                value={config.hqHeading}
+                onChange={(e) => setConfig({ ...config, hqHeading: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-[#1a6c7a] outline-none transition"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-amber-500" />
+                <span>Physical Office Address</span>
+              </label>
+              <input
+                type="text"
+                value={config.address}
+                onChange={(e) => setConfig({ ...config, address: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-[#1a6c7a] outline-none transition"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-amber-500" />
+                <span>Phone / Hotline</span>
+              </label>
+              <input
+                type="text"
+                value={config.phone}
+                onChange={(e) => setConfig({ ...config, phone: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-[#1a6c7a] outline-none transition"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-amber-500" />
+                <span>Official Contact Email</span>
+              </label>
+              <input
+                type="text"
+                value={config.email}
+                onChange={(e) => setConfig({ ...config, email: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-[#1a6c7a] outline-none transition"
+              />
+            </div>
+
+            <div className="space-y-1.5 md:col-span-2">
+              <label className="block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-amber-500" />
+                <span>Working / Operating Hours</span>
+              </label>
+              <input
+                type="text"
+                value={config.workingHours}
+                onChange={(e) => setConfig({ ...config, workingHours: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-[#1a6c7a] outline-none transition"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Live Preview Card */}
+        <div className="space-y-3 pt-4 border-t border-slate-100">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Real-time Live Preview
+            </span>
+            <span className="text-[11px] text-amber-600 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 font-medium">
+              Synchronized with Public Footer
+            </span>
+          </div>
+
+          <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 text-slate-300 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 text-xs">
+              {/* Brand Preview */}
+              <div className="lg:col-span-2 space-y-3">
+                {config.brandLogoUrl && (
+                  <img
+                    src={config.brandLogoUrl}
+                    alt="Logo"
+                    className="h-8 w-auto object-contain"
+                  />
+                )}
+                <p className="text-slate-400 text-xs leading-relaxed max-w-sm">
+                  {config.brandDescription}
+                </p>
+              </div>
+
+              {/* Navigation Preview */}
+              <div className="space-y-2">
+                <h5 className="font-bold uppercase tracking-wider text-slate-100 text-[11px]">
+                  {config.navHeading}
+                </h5>
+                <ul className="space-y-1 text-slate-400 text-[11px]">
+                  <li>{config.navHomeLabel}</li>
+                  <li>{config.navAboutLabel}</li>
+                  <li>{config.navServicesLabel}</li>
+                  <li>{config.navContactLabel}</li>
+                </ul>
+              </div>
+
+              {/* Services Preview */}
+              <div className="space-y-2">
+                <h5 className="font-bold uppercase tracking-wider text-slate-100 text-[11px]">
+                  {config.servicesHeading}
+                </h5>
+                <ul className="space-y-1 text-slate-400 text-[11px]">
+                  {config.servicesList.map((s, idx) => (
+                    <li key={idx} className="truncate">{s}</li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* HQ Preview */}
+              <div className="space-y-2">
+                <h5 className="font-bold uppercase tracking-wider text-slate-100 text-[11px]">
+                  {config.hqHeading}
+                </h5>
+                <div className="space-y-1.5 text-slate-400 text-[11px]">
+                  <div className="flex items-start gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                    <span>{config.address}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span className="font-mono">{config.phone}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span className="truncate">{config.email}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>{config.workingHours}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Bar Preview */}
+            <div className="pt-4 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-2">
+              <span>
+                &copy; {new Date().getFullYear()} <strong>{config.copyrightBrand}</strong>. {config.copyrightSuffix}
+              </span>
+              <span>
+                {config.creditPrefix}{' '}
+                <strong className="text-slate-300">{config.creditDevName}</strong>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Button at Bottom */}
+        <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={handleResetDefaults}
+            className="px-4 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+            <span>Reset Defaults</span>
+          </button>
+
+          <button
+            type="submit"
+            className="px-6 py-2.5 bg-[#1a6c7a] hover:bg-[#153243] text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg flex items-center gap-2 transition cursor-pointer"
+          >
+            {saved ? (
+              <>
+                <CheckCircle className="w-4 h-4 text-emerald-300" />
+                <span>Saved Live!</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 text-amber-400" />
+                <span>Save Changes</span>
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
