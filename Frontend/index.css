@@ -59,3 +59,20 @@
 .rotate-y-180 {
   transform: rotateY(180deg);
 }
+
+/* Rich text formatting rules for footer description & Word-like styling */
+.rich-footer-text b,
+.rich-footer-text strong {
+  font-weight: 700;
+  color: inherit;
+}
+
+.rich-footer-text i,
+.rich-footer-text em {
+  font-style: italic;
+}
+
+.rich-footer-text u {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
