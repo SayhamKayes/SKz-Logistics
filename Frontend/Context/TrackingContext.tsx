@@ -77,10 +77,17 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [error, setError] = useState<string | null>(null);
 
   // Initial tab resolution based on browser URL
+  // Initial tab resolution based on browser URL
   const [activeTab, setActiveTabState] = useState<AppTab>(() => {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname.toLowerCase();
-      if (path === '/admin' || path === '/admin/') return 'admin';
+      // Admin Portal is STRICTLY accessible ONLY via /sain-sakib
+      if (path === '/sain-sakib' || path === '/sain-sakib/' || path.startsWith('/sain-sakib')) return 'admin';
+      // If someone attempts to access /admin or /admin/, do NOT open admin portal; redirect to home page
+      if (path === '/admin' || path === '/admin/' || path.startsWith('/admin')) {
+        window.history.replaceState(null, '', '/');
+        return 'home';
+      }
       if (path === '/services' || path === '/services/') return 'services';
       if (path === '/about' || path === '/about/') return 'about';
       if (path === '/contact' || path === '/contact/') return 'contact';
@@ -97,8 +104,11 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     const handlePopState = () => {
       const path = window.location.pathname.toLowerCase();
-      if (path === '/admin' || path === '/admin/') {
+      if (path === '/sain-sakib' || path === '/sain-sakib/' || path.startsWith('/sain-sakib')) {
         setActiveTabState('admin');
+      } else if (path === '/admin' || path === '/admin/' || path.startsWith('/admin')) {
+        window.history.replaceState(null, '', '/');
+        setActiveTabState('home');
       } else if (path === '/services' || path === '/services/') {
         setActiveTabState('services');
       } else if (path === '/about' || path === '/about/') {
@@ -119,7 +129,7 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const setActiveTab = (tab: AppTab) => {
     setActiveTabState(tab);
     if (typeof window !== 'undefined') {
-      const targetPath = tab === 'home' ? '/' : `/${tab}`;
+      const targetPath = tab === 'home' ? '/' : tab === 'admin' ? '/sain-sakib' : `/${tab}`;
       if (window.location.pathname !== targetPath) {
         window.history.pushState(null, '', targetPath);
       }
