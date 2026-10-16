@@ -403,3 +403,46 @@ def reset_password(request):
     })
 
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_all_site_configs(request):
+    """
+    Returns all stored site configurations as a key-value mapping from Neon PostgreSQL.
+    """
+    from core.models import SiteConfig
+    configs = SiteConfig.objects.all()
+    result = {c.key: c.data for c in configs}
+    return Response(result, status=status.HTTP_200_OK)
+
+
+@api_view(['GET', 'POST', 'PUT'])
+@permission_classes([AllowAny])
+def site_config_detail(request, key):
+    """
+    Get or update a specific site configuration by key in Neon PostgreSQL.
+    """
+    from core.models import SiteConfig
+    clean_key = key.strip().lower()
+
+    if request.method == 'GET':
+        config = SiteConfig.objects.filter(key=clean_key).first()
+        if not config:
+            return Response({"key": clean_key, "data": None, "exists": False}, status=status.HTTP_200_OK)
+        return Response({"key": config.key, "data": config.data, "exists": True, "updated_at": config.updated_at}, status=status.HTTP_200_OK)
+
+    elif request.method in ['POST', 'PUT']:
+        data = request.data
+        payload_data = data.get('data', data) if isinstance(data, dict) and 'data' in data and len(data) == 1 else data
+        config, created = SiteConfig.objects.update_or_create(
+            key=clean_key,
+            defaults={'data': payload_data}
+        )
+        return Response({
+            "success": True,
+            "key": config.key,
+            "created": created,
+            "updated_at": config.updated_at,
+            "data": config.data
+        }, status=status.HTTP_200_OK)
+
+
