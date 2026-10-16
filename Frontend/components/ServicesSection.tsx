@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTracking } from '../Context/TrackingContext';
 import {
   DEFAULT_SERVICE_CARDS,
@@ -20,15 +20,8 @@ interface ServicesSectionProps {
 
 export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = false }) => {
   const { setActiveTab } = useTracking();
-  const [startIndex, setStartIndex] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-  const [activeFlippedCard, setActiveFlippedCard] = useState<string | null>(null);
 
-  // Drag & Swipe states
-  const [dragStartX, setDragStartX] = useState<number | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-
-  // Header config state
+  // 1. Header config state
   const [headerConfig, setHeaderConfig] = useState<ServicesSectionHeaderConfig>(() => {
     try {
       const stored = localStorage.getItem('sain_services_section_config');
@@ -37,7 +30,7 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
     return DEFAULT_SERVICES_HEADER;
   });
 
-  // Services cards state
+  // 2. Services cards state
   const [services, setServices] = useState<ServiceCard[]>(() => {
     try {
       const stored = localStorage.getItem('sain_services_content_config');
@@ -56,6 +49,37 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
     } catch {}
     return DEFAULT_SERVICE_CARDS;
   });
+
+  const totalItems = services.length;
+
+  // 3. Carousel sliding states (services is already initialized)
+  const [startIndex, setStartIndex] = useState<number>(() => (totalItems > 0 ? totalItems : 0));
+  const [isTransitioning, setIsTransitioning] = useState(true);
+  const [isHovered, setIsHovered] = useState(false);
+  const [activeFlippedCard, setActiveFlippedCard] = useState<string | null>(null);
+
+  // Responsive visible cards count
+  const [visibleCount, setVisibleCount] = useState(3);
+
+  useEffect(() => {
+    const updateVisible = () => {
+      if (typeof window === 'undefined') return;
+      if (window.innerWidth >= 1024) {
+        setVisibleCount(3);
+      } else if (window.innerWidth >= 640) {
+        setVisibleCount(2);
+      } else {
+        setVisibleCount(1);
+      }
+    };
+    updateVisible();
+    window.addEventListener('resize', updateVisible);
+    return () => window.removeEventListener('resize', updateVisible);
+  }, []);
+
+  // Drag & Swipe states
+  const [dragStartX, setDragStartX] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -87,32 +111,66 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
     };
   }, []);
 
-  const totalItems = services.length;
+  // Tripled array for seamless infinite sliding
+  const clonedCards = useMemo(() => {
+    if (services.length === 0) return [];
+    return [...services, ...services, ...services];
+  }, [services]);
 
-  // Auto-play infinite continuous carousel: moves 1 card smoothly every 3.5 seconds
+  // Keep index synchronized if services count changes
   useEffect(() => {
-    if (fullGrid || isPaused || isDragging || totalItems <= 1) return;
+    if (totalItems > 0 && startIndex < totalItems) {
+      setStartIndex(totalItems);
+    }
+  }, [totalItems, startIndex]);
+
+  const handlePrev = useCallback(() => {
+    if (totalItems <= 0) return;
+    setIsTransitioning(true);
+    setStartIndex((prev) => prev - 1);
+  }, [totalItems]);
+
+  const handleNext = useCallback(() => {
+    if (totalItems <= 0) return;
+    setIsTransitioning(true);
+    setStartIndex((prev) => prev + 1);
+  }, [totalItems]);
+
+  // Re-enable transition smoothly after instant loop resets
+  useEffect(() => {
+    if (!isTransitioning) {
+      const raf = requestAnimationFrame(() => {
+        setIsTransitioning(true);
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [isTransitioning]);
+
+  const handleTransitionEnd = () => {
+    if (totalItems <= 0) return;
+    if (startIndex >= totalItems * 2) {
+      setIsTransitioning(false);
+      setStartIndex((prev) => prev - totalItems);
+    } else if (startIndex < totalItems) {
+      setIsTransitioning(false);
+      setStartIndex((prev) => prev + totalItems);
+    }
+  };
+
+  // Auto-play: moves 1 card smoothly every 2 seconds, paused on hover or drag
+  useEffect(() => {
+    if (fullGrid || isHovered || isDragging || totalItems <= 1) return;
 
     const timer = setInterval(() => {
-      setStartIndex((prev) => (prev + 1) % totalItems);
-    }, 3500);
+      handleNext();
+    }, 2000);
 
     return () => clearInterval(timer);
-  }, [fullGrid, isPaused, isDragging, totalItems]);
-
-  const handlePrev = () => {
-    if (totalItems <= 0) return;
-    setStartIndex((prev) => (prev - 1 + totalItems) % totalItems);
-  };
-
-  const handleNext = () => {
-    if (totalItems <= 0) return;
-    setStartIndex((prev) => (prev + 1) % totalItems);
-  };
+  }, [fullGrid, isHovered, isDragging, totalItems, handleNext]);
 
   // Drag / Swipe handlers
   const handleTouchStart = (e: React.TouchEvent) => {
-    setIsPaused(true);
+    setIsHovered(true);
     setDragStartX(e.touches[0].clientX);
   };
 
@@ -126,12 +184,12 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
       handlePrev();
     }
     setDragStartX(null);
-    setIsPaused(false);
+    setIsHovered(false);
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
-    setIsPaused(true);
+    setIsHovered(true);
     setDragStartX(e.clientX);
   };
 
@@ -145,19 +203,19 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
     }
     setDragStartX(null);
     setIsDragging(false);
-    setIsPaused(false);
+    setIsHovered(false);
   };
 
   const toggleCardFlip = (id: string) => {
     setActiveFlippedCard((prev) => (prev === id ? null : id));
   };
 
-  // Up to 3 visible items for slider
-  const visibleCards = totalItems > 0 ? [
-    services[(startIndex) % totalItems],
-    services[(startIndex + 1) % totalItems],
-    services[(startIndex + 2) % totalItems],
-  ] : [];
+  const activeDotIndex = totalItems > 0 ? ((startIndex % totalItems) + totalItems) % totalItems : 0;
+
+  const handleDotClick = (idx: number) => {
+    setIsTransitioning(true);
+    setStartIndex(totalItems + idx);
+  };
 
   return (
     <section id="services" className="relative py-16 px-4 sm:px-8 z-10 bg-white">
@@ -206,37 +264,51 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
           </div>
         ) : (
           /* ============================================================== */
-          /* CASE 2: 3-COLUMN INFINITE CONTINUOUS SLIDER (Home Page)        */
+          /* CASE 2: CONTINUOUS BUTTERY SMOOTH SLIDING CAROUSEL (Home Page) */
           /* ============================================================== */
           <div
             className="relative"
-            onMouseEnter={() => setIsPaused(true)}
-            onMouseLeave={() => {
-              if (!isDragging) setIsPaused(false);
-            }}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
           >
-            {/* Slider Viewport with Drag Support */}
+            {/* Slider Viewport with padding so shadows are not clipped */}
             <div
-              className={`overflow-hidden select-none cursor-grab ${isDragging ? 'cursor-grabbing' : ''}`}
+              className={`overflow-hidden py-4 -my-4 px-1 select-none cursor-grab ${
+                isDragging ? 'cursor-grabbing' : ''
+              }`}
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
               onMouseDown={handleMouseDown}
               onMouseUp={handleMouseUp}
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 px-1 transition-all duration-500 ease-out">
-                {visibleCards.map((srv, cardIdx) => (
-                  <ServiceFlipCard
-                    key={`${srv.id}-${cardIdx}-${startIndex}`}
-                    service={srv}
-                    isFlipped={activeFlippedCard === srv.id}
-                    onToggleFlip={() => toggleCardFlip(srv.id)}
-                  />
+              <div
+                className="flex will-change-transform"
+                style={{
+                  transform: `translateX(-${startIndex * (100 / visibleCount)}%)`,
+                  transition: isTransitioning
+                    ? 'transform 700ms cubic-bezier(0.25, 1, 0.5, 1)'
+                    : 'none',
+                }}
+                onTransitionEnd={handleTransitionEnd}
+              >
+                {clonedCards.map((srv, cardIdx) => (
+                  <div
+                    key={`${srv.id}-${cardIdx}`}
+                    style={{ width: `${100 / visibleCount}%` }}
+                    className="flex-shrink-0 px-3 sm:px-4"
+                  >
+                    <ServiceFlipCard
+                      service={srv}
+                      isFlipped={activeFlippedCard === srv.id}
+                      onToggleFlip={() => toggleCardFlip(srv.id)}
+                    />
+                  </div>
                 ))}
               </div>
             </div>
 
             {/* Carousel Navigation Arrows */}
-            {totalItems > 3 && (
+            {totalItems > visibleCount && (
               <>
                 <button
                   type="button"
@@ -264,10 +336,10 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
                 {services.map((_, idx) => (
                   <button
                     key={idx}
-                    onClick={() => setStartIndex(idx)}
+                    onClick={() => handleDotClick(idx)}
                     aria-label={`Go to service ${idx + 1}`}
                     className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
-                      startIndex === idx
+                      activeDotIndex === idx
                         ? 'w-8 bg-[#1a6c7a]'
                         : 'w-2.5 bg-slate-300 hover:bg-slate-400'
                     }`}
@@ -300,8 +372,8 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
 
 // ==============================================================================
 // 3D FLIP CARD COMPONENT
-// Front face: Clean, pure thumbnail image only (as requested by user)
-// Back face: Heading, description, and key points list (instant quote/track removed)
+// Front face: Clean, pure thumbnail image with unclipped natural drop shadow
+// Back face: Heading, description, and key points list
 // ==============================================================================
 interface ServiceFlipCardProps {
   service: ServiceCard;
@@ -316,29 +388,29 @@ const ServiceFlipCard: React.FC<ServiceFlipCardProps> = ({
 }) => {
   return (
     <div
-      className="perspective-1000 w-full h-[480px] group cursor-pointer select-none"
+      className="perspective-1000 w-full h-[510px] group cursor-pointer select-none"
       onClick={onToggleFlip}
     >
       <div
-        className={`relative w-full h-full transition-transform duration-700 transform-style-3d rounded-3xl shadow-md hover:shadow-xl ${
+        className={`relative w-full h-full transition-transform duration-700 transform-style-3d rounded-3xl ${
           isFlipped ? 'rotate-y-180' : 'group-hover:rotate-y-180'
         }`}
       >
         {/* ============================================================== */}
-        {/* CARD FRONT FACE: Pure Full-Bleed Thumbnail Image (No Text)     */}
+        {/* CARD FRONT FACE: Pure Full-Bleed Thumbnail Image (Unclipped)   */}
         {/* ============================================================== */}
-        <div className="absolute inset-0 w-full h-full backface-hidden bg-slate-950 rounded-3xl overflow-hidden border border-slate-200/90 shadow-md">
+        <div className="absolute inset-0 w-full h-full backface-hidden bg-slate-950 rounded-3xl overflow-hidden border border-slate-800/80 shadow-xl group-hover:shadow-2xl transition-all duration-300">
           {service.image ? (
             <img
               src={service.image}
               alt={service.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 rounded-3xl"
               onError={(e) => {
                 (e.target as HTMLImageElement).src = '/assets/images/air_freight.webp';
               }}
             />
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-slate-400 p-6 text-center">
+            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-slate-400 p-6 text-center rounded-3xl">
               <span className="text-base font-bold text-white">{service.title}</span>
               <span className="text-xs text-slate-400 mt-1">Hover to view details</span>
             </div>
@@ -391,3 +463,4 @@ const ServiceFlipCard: React.FC<ServiceFlipCardProps> = ({
     </div>
   );
 };
+
