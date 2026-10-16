@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTracking } from '../../Context/TrackingContext';
 import { Consignment, PackageItem, ShipmentHistoryItem, getStatusProgressAndColor, buildConsignmentTimeline, normalizeStatus, getBangladeshDateTime } from '../../services/trackingData';
 import { WaybillPrintModal } from './WaybillPrintModal';
+import { ConfirmModal } from './ConfirmModal';
 import {
   Package,
   Plus,
@@ -62,6 +63,14 @@ export const ShipmentManager: React.FC = () => {
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [statusToast, setStatusToast] = useState<StatusToastData | null>(null);
   const [isWaybillOpen, setIsWaybillOpen] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    type?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  } | null>(null);
 
   // View Filter: Active vs Trash
   const [viewTab, setViewTab] = useState<'active' | 'trash'>('active');
@@ -718,26 +727,34 @@ export const ShipmentManager: React.FC = () => {
   // ==========================================================
   const handleMoveToTrash = () => {
     if (!currentConsignment) return;
-    if (window.confirm(`Move consignment ${consignmentNo} to Trash? You can restore it anytime.`)) {
-      const updatedTrash = {
-        ...trashedConsignments,
-        [consignmentNo]: {
-          consignment: currentConsignment,
-          trashedAt: new Date().toLocaleString(),
-        },
-      };
-      setTrashedConsignments(updatedTrash);
-      localStorage.setItem('sain_trashed_consignments', JSON.stringify(updatedTrash));
+    setConfirmModal({
+      isOpen: true,
+      title: 'Move Consignment to Trash?',
+      message: `Move consignment ${consignmentNo} to Trash? You can restore it anytime from the Recycle Bin.`,
+      confirmText: 'Move to Trash',
+      type: 'warning',
+      onConfirm: () => {
+        const updatedTrash = {
+          ...trashedConsignments,
+          [consignmentNo]: {
+            consignment: currentConsignment,
+            trashedAt: new Date().toLocaleString(),
+          },
+        };
+        setTrashedConsignments(updatedTrash);
+        localStorage.setItem('sain_trashed_consignments', JSON.stringify(updatedTrash));
 
-      setSaveSuccessMsg(`Consignment ${consignmentNo} moved to Trash (Recycle Bin).`);
-      setTimeout(() => setSaveSuccessMsg(null), 3500);
+        setSaveSuccessMsg(`Consignment ${consignmentNo} moved to Trash (Recycle Bin).`);
+        setTimeout(() => setSaveSuccessMsg(null), 3500);
 
-      // Select another active consignment
-      const remainingKeys = Object.keys(activeConsignmentsList).filter((k) => k !== consignmentNo);
-      if (remainingKeys.length > 0) {
-        setSelectedNo(remainingKeys[0]);
-      }
-    }
+        // Select another active consignment
+        const remainingKeys = Object.keys(activeConsignmentsList).filter((k) => k !== consignmentNo);
+        if (remainingKeys.length > 0) {
+          setSelectedNo(remainingKeys[0]);
+        }
+        setConfirmModal(null);
+      },
+    });
   };
 
   const handleRestoreFromTrash = (noToRestore: string) => {
@@ -755,20 +772,28 @@ export const ShipmentManager: React.FC = () => {
     setTimeout(() => setSaveSuccessMsg(null), 3500);
   };
 
-  const handleDeletePermanently = async (noToDelete: string) => {
-    if (window.confirm(`Permanently delete ${noToDelete}? This action cannot be undone.`)) {
-      const copy = { ...trashedConsignments };
-      delete copy[noToDelete];
-      setTrashedConsignments(copy);
-      localStorage.setItem('sain_trashed_consignments', JSON.stringify(copy));
-      try {
-        await deleteConsignment(noToDelete);
-      } catch (e) {
-        console.warn('Failed to delete from database:', e);
-      }
-      setSaveSuccessMsg(`Consignment ${noToDelete} permanently deleted.`);
-      setTimeout(() => setSaveSuccessMsg(null), 3000);
-    }
+  const handleDeletePermanently = (noToDelete: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Permanently Delete Consignment?',
+      message: `Permanently delete ${noToDelete}? This action cannot be undone and will remove all history records.`,
+      confirmText: 'Delete Permanently',
+      type: 'danger',
+      onConfirm: async () => {
+        const copy = { ...trashedConsignments };
+        delete copy[noToDelete];
+        setTrashedConsignments(copy);
+        localStorage.setItem('sain_trashed_consignments', JSON.stringify(copy));
+        try {
+          await deleteConsignment(noToDelete);
+        } catch (e) {
+          console.warn('Failed to delete from database:', e);
+        }
+        setSaveSuccessMsg(`Consignment ${noToDelete} permanently deleted.`);
+        setTimeout(() => setSaveSuccessMsg(null), 3000);
+        setConfirmModal(null);
+      },
+    });
   };
 
   // ==========================================================
@@ -1126,15 +1151,16 @@ export const ShipmentManager: React.FC = () => {
             <span>Print Waybill & Invoice</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => openTrackingModal(consignmentNo)}
-            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer border border-slate-300"
-            title="Preview this consignment in Live Tracking Modal"
+          <a
+            href={`/?track=${encodeURIComponent(consignmentNo)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer border border-slate-300 shadow-xs"
+            title={`Preview consignment #${consignmentNo} on Live Public Website in a new tab`}
           >
             <span>Live Tracking Preview</span>
-            <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-          </button>
+            <ExternalLink className="w-3.5 h-3.5 text-[#1a6c7a]" />
+          </a>
         </div>
       </div>
 
@@ -1148,9 +1174,21 @@ export const ShipmentManager: React.FC = () => {
       {/* Main Form Box: Consignment No & Author */}
       <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex-1 min-w-[280px]">
-          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-            Consignment Title / Air Waybill (AWB)
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Consignment Title / Air Waybill (AWB)
+            </label>
+            <a
+              href={`/?track=${encodeURIComponent(consignmentNo)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] font-bold text-[#1a6c7a] hover:text-[#145561] hover:underline flex items-center gap-1"
+              title="Track this consignment on live website in a new tab"
+            >
+              <span>Track in New Tab</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
           <input
             type="text"
             value={consignmentNo}
@@ -2317,6 +2355,19 @@ export const ShipmentManager: React.FC = () => {
           consignment={currentConsignment}
           isOpen={isWaybillOpen}
           onClose={() => setIsWaybillOpen(false)}
+        />
+      )}
+
+      {/* Custom Confirm Modal replacing window.confirm */}
+      {confirmModal && (
+        <ConfirmModal
+          isOpen={confirmModal.isOpen}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          confirmText={confirmModal.confirmText}
+          type={confirmModal.type}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
         />
       )}
     </div>
