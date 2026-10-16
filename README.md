@@ -100,7 +100,7 @@ flowchart TD
 - **Cargo Specification Breakdown**: Detailed display of Gross Weight, Carton Count, Volume (CBM), Payment Mode, HS Codes, and Dimensions.
 - **Statutory Customs Compliance**: Live assessment badge under the **Bangladesh Customs Act 2023**, trade terms (DAP/CFR), and assessment stations.
 
-### 2. 🛠️ Enterprise Admin Portal (`/admin`)
+### 2. 🛠️ Enterprise Admin Portal (`/sain-sakib`)
 - **Complete Consignment Lifecycle Management**: Add, modify, publish, archive, or trash consignments.
 - **`+ Add New Bill` Generator**: Generates an auto-incremented, collision-checked unique consignment code starting with **`SAINEX` + 8 digits** (e.g., `SAINEX58291402`), resetting all fields to a clean state ready for entry.
 - **10-Checkpoint Milestone Pagination**: Shipment history checkpoints table paginated to **10 records per page** with interactive `[Prev] [1] [2] ... [Next]` navigation controls.
@@ -387,7 +387,7 @@ You are permitted to freely use, modify, distribute, and integrate this software
 ## 👨‍💻 Author & Engineering Credits
 
 - **Lead Engineer & Architect**: **[Sayham Kayes](https://github.com/SayhamKayes)**
-- **Organization**: SAIN International Logistics
+- **Organization**: SKzLAB
 - **Repository**: [SayhamKayes/SKz-Logistics](https://github.com/SayhamKayes/SKz-Logistics.git)
 
 ---
