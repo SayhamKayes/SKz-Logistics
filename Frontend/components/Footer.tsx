@@ -12,6 +12,7 @@ import {
   FOOTER_STORAGE_KEY,
   FOOTER_UPDATE_EVENT,
 } from './admin/FooterContentEditor';
+import { sanitizeRichHtml } from '../utils/sanitizeHtml';
 
 export const Footer: React.FC = () => {
   const { setActiveTab } = useTracking();
@@ -68,9 +69,10 @@ export const Footer: React.FC = () => {
                 className="h-6 sm:h-8 md:h-12 w-auto object-contain drop-shadow-[0_4px_16px_rgba(0,0,0,0.9)]"
               />
             )}
-            <p className="text-xs sm:text-sm text-slate-400 leading-relaxed max-w-sm">
-              {config.brandDescription}
-            </p>
+            <div
+              className="text-xs sm:text-sm text-slate-400 leading-relaxed max-w-sm rich-footer-text"
+              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(config.brandDescription) }}
+            />
           </div>
 
           {/* Quick Links */}
