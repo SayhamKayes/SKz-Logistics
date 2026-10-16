@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Save, CheckCircle, Truck, Plus, Trash2, Edit3, Upload, Image, X, ListPlus } from 'lucide-react';
+import { Save, CheckCircle, Truck, Plus, Trash2, Edit3, Upload, Image, X, ListPlus, ExternalLink } from 'lucide-react';
+import { ConfirmModal } from './ConfirmModal';
+import { saveSiteConfigToDb } from '../../services/siteConfigService';
 
 export interface ServiceCard {
   id: string;
@@ -120,11 +122,21 @@ export const ServicesContentEditor: React.FC = () => {
   const [isNewCard, setIsNewCard] = useState(false);
   const [newFeatureInput, setNewFeatureInput] = useState('');
   const [saved, setSaved] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    type?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  } | null>(null);
 
   // Save changes to localStorage & dispatch live update
   const persistChanges = (updatedCards: ServiceCard[], updatedHeader: ServicesSectionHeaderConfig) => {
     localStorage.setItem('sain_services_content_config', JSON.stringify(updatedCards));
     localStorage.setItem('sain_services_section_config', JSON.stringify(updatedHeader));
+    saveSiteConfigToDb('sain_services_content_config', updatedCards);
+    saveSiteConfigToDb('sain_services_section_config', updatedHeader);
     window.dispatchEvent(new Event('sain_services_content_updated'));
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
@@ -155,11 +167,19 @@ export const ServicesContentEditor: React.FC = () => {
   };
 
   const handleDeleteCard = (id: string, title: string) => {
-    if (window.confirm(`Are you sure you want to delete the service card "${title}"?`)) {
-      const updated = cards.filter((c) => c.id !== id);
-      setCards(updated);
-      persistChanges(updated, headerConfig);
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Service Card?',
+      message: `Are you sure you want to delete the service card "${title}"? This will remove it from the homepage services catalog.`,
+      confirmText: 'Delete Card',
+      type: 'danger',
+      onConfirm: () => {
+        const updated = cards.filter((c) => c.id !== id);
+        setCards(updated);
+        persistChanges(updated, headerConfig);
+        setConfirmModal(null);
+      },
+    });
   };
 
   const handleCardImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -228,11 +248,19 @@ export const ServicesContentEditor: React.FC = () => {
   };
 
   const handleResetAllDefaults = () => {
-    if (window.confirm('Reset all Services and section header back to defaults?')) {
-      setHeaderConfig(DEFAULT_SERVICES_HEADER);
-      setCards(DEFAULT_SERVICE_CARDS);
-      persistChanges(DEFAULT_SERVICE_CARDS, DEFAULT_SERVICES_HEADER);
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Reset All Services to Defaults?',
+      message: 'Are you sure you want to reset all service cards and section header back to defaults? Any custom service cards will be lost.',
+      confirmText: 'Reset to Defaults',
+      type: 'warning',
+      onConfirm: () => {
+        setHeaderConfig(DEFAULT_SERVICES_HEADER);
+        setCards(DEFAULT_SERVICE_CARDS);
+        persistChanges(DEFAULT_SERVICE_CARDS, DEFAULT_SERVICES_HEADER);
+        setConfirmModal(null);
+      },
+    });
   };
 
   return (
@@ -256,6 +284,16 @@ export const ServicesContentEditor: React.FC = () => {
               <span>Catalog Updated Live</span>
             </span>
           )}
+          <a
+            href="/services"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-bold px-3 py-1.5 border border-[#1a6c7a]/30 text-[#1a6c7a] bg-[#1a6c7a]/5 hover:bg-[#1a6c7a]/15 rounded-lg transition inline-flex items-center gap-1.5 cursor-pointer"
+            title="Open Live Services page in a new tab"
+          >
+            <span>View Live Services</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
           <button
             type="button"
             onClick={handleResetAllDefaults}
@@ -617,6 +655,19 @@ export const ServicesContentEditor: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Custom Confirm Modal replacing window.confirm */}
+      {confirmModal && (
+        <ConfirmModal
+          isOpen={confirmModal.isOpen}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          confirmText={confirmModal.confirmText}
+          type={confirmModal.type}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
       )}
     </div>
   );
