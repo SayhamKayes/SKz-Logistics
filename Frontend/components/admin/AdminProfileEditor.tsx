@@ -13,7 +13,10 @@ import {
   EyeOff,
   Sparkles,
   Clock,
+  ExternalLink,
 } from 'lucide-react';
+import { saveSiteConfigToDb } from '../../services/siteConfigService';
+import { getAdminInitials } from '../../utils/adminInitials';
 
 interface AdminProfileEditorProps {
   onProfileUpdated?: (updated: { name: string; username: string }) => void;
@@ -104,6 +107,7 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
     };
 
     localStorage.setItem('sain_admin_profile', JSON.stringify(updatedProfile));
+    saveSiteConfigToDb('sain_admin_profile', updatedProfile);
     setStoredPassword(passwordToSave);
     setLastUpdated(timestamp);
 
@@ -141,6 +145,16 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
         </div>
 
         <div className="flex items-center gap-2">
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3.5 py-1.5 border border-[#1a6c7a]/30 text-[#1a6c7a] bg-[#1a6c7a]/5 hover:bg-[#1a6c7a]/15 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 transition cursor-pointer"
+            title="Open Public Website in a new tab"
+          >
+            <span>Public Site</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
           <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200/80 rounded-lg text-xs font-bold">
             <ShieldCheck className="w-4 h-4 text-amber-600" />
             <span>Super Administrator</span>
@@ -169,8 +183,8 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
       {/* Profile Overview Card */}
       <div className="p-4 bg-gradient-to-r from-slate-900 to-[#122b30] rounded-xl text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-full bg-amber-400/20 border-2 border-amber-400 text-amber-300 font-bold text-base flex items-center justify-center">
-            {name.substring(0, 2).toUpperCase() || 'SA'}
+          <div className="w-12 h-12 rounded-full bg-amber-400/20 border-2 border-amber-400 text-amber-300 font-bold text-base flex items-center justify-center select-none shadow-xs">
+            {getAdminInitials(name)}
           </div>
           <div>
             <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -206,8 +220,15 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
                 <input
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    const newName = e.target.value;
+                    setName(newName);
+                    if (onProfileUpdated) {
+                      onProfileUpdated({ name: newName, username });
+                    }
+                  }}
                   className="w-full text-xs font-semibold border border-slate-300 rounded-lg pl-9 pr-3 py-2.5 outline-none focus:border-[#1a6c7a]"
+                  placeholder="e.g. Sakib Ahmed"
                   required
                 />
                 <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -222,8 +243,15 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
                 <input
                   type="text"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) => {
+                    const newUsername = e.target.value;
+                    setUsername(newUsername);
+                    if (onProfileUpdated) {
+                      onProfileUpdated({ name, username: newUsername });
+                    }
+                  }}
                   className="w-full text-xs font-semibold border border-slate-300 rounded-lg pl-9 pr-3 py-2.5 outline-none focus:border-[#1a6c7a]"
+                  placeholder="e.g. sain_sakib6055"
                   required
                 />
                 <span className="text-xs font-bold text-slate-400 absolute left-3 top-2.5">@</span>
