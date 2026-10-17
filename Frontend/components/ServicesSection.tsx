@@ -68,18 +68,18 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
 
   const baseCount = services.length;
 
-  // Tripled list for true seamless infinite continuous carousel looping
+  // 5x cloned list ensures a huge buffer on both sides so slides NEVER run out or go blank
   const clonedServices = React.useMemo(() => {
     if (baseCount === 0) return [];
-    return [...services, ...services, ...services];
+    return [...services, ...services, ...services, ...services, ...services];
   }, [services, baseCount]);
 
-  // Start in the middle copy
-  const [currentIndex, setCurrentIndex] = useState(baseCount);
+  // Start centered in the middle copy (index baseCount * 2)
+  const [currentIndex, setCurrentIndex] = useState(baseCount * 2);
 
   // Keep currentIndex centered when services change
   useEffect(() => {
-    setCurrentIndex(services.length);
+    setCurrentIndex(services.length * 2);
   }, [services.length]);
 
   // Handle responsive resize for exact track translations
@@ -163,19 +163,21 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
     setCurrentIndex((prev) => prev - 1);
   };
 
-  const handleTransitionEnd = () => {
+  const handleTransitionEnd = (e: React.TransitionEvent) => {
+    // CRITICAL: ignore bubbling transitionend events from child flip cards!
+    if (e.target !== e.currentTarget) return;
     setIsSliding(false);
     if (baseCount <= 0) return;
 
-    // Passed the middle copy to the right -> silently reset back to middle copy
-    if (currentIndex >= baseCount * 2) {
+    // When advancing past the 3rd set, silently wrap back into the 2nd/3rd set
+    if (currentIndex >= baseCount * 3) {
       setWithTransition(false);
-      setCurrentIndex((prev) => prev - baseCount);
+      setCurrentIndex((prev) => (prev % baseCount) + baseCount * 2);
     }
-    // Moved before the middle copy to the left -> silently reset forward to middle copy
-    else if (currentIndex < baseCount) {
+    // When moving backwards before the 2nd set, silently wrap forward into the 3rd set
+    else if (currentIndex < baseCount * 2) {
       setWithTransition(false);
-      setCurrentIndex((prev) => prev + baseCount);
+      setCurrentIndex((prev) => (prev % baseCount) + baseCount * 2);
     }
   };
 
@@ -276,14 +278,18 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
                   }}
                   onTransitionEnd={handleTransitionEnd}
                 >
-                  {clonedServices.map((srv, slideIdx) => (
-                    <div
-                      key={`${srv.id}-${slideIdx}`}
-                      className="shrink-0 w-full md:w-1/2 lg:w-1/3 px-3 sm:px-4"
-                    >
-                      <ServiceFlipCard service={srv} />
-                    </div>
-                  ))}
+                  {clonedServices.map((_, slideIdx) => {
+                    const srv = services[slideIdx % baseCount];
+                    if (!srv) return null;
+                    return (
+                      <div
+                        key={`${srv.id}-${slideIdx}`}
+                        className="shrink-0 w-full md:w-1/2 lg:w-1/3 px-3 sm:px-4"
+                      >
+                        <ServiceFlipCard service={srv} />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
