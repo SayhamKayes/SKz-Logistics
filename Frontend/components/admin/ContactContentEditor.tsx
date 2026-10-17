@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { API_BASE_URL } from '../../services/databaseConfig';
 import { ConfirmModal } from './ConfirmModal';
+import { SaveSuccessModal } from './SaveSuccessModal';
 import { saveSiteConfigToDb } from '../../services/siteConfigService';
 import { RichParagraphEditor } from './RichParagraphEditor';
 
@@ -45,6 +46,14 @@ export interface ContactConfig {
   workingHours: string;
   weekendLabel: string;
   weekendStatus: string;
+
+  // Ready to Ship? Parallax CTA Banner (Full-Width Home / Contact Section)
+  ctaTagline: string;
+  ctaHeading: string;
+  ctaDescription: string;
+  ctaContactBtnText: string;
+  ctaContactBtnLink: string;
+  ctaTrackBtnText: string;
 
   // Google Map Location (Contact Page)
   mapLocationTitle: string;
@@ -83,6 +92,13 @@ export const DEFAULT_CONTACT_CONFIG: ContactConfig = {
   workingHours: '10:00 AM – 9:00 PM',
   weekendLabel: 'Friday:',
   weekendStatus: 'Closed',
+
+  ctaTagline: "Ready To Ship? Let's Get Your Packages Moving!",
+  ctaHeading: 'Join thousands of satisfied customers who trust SAIN Ship for safe and timely deliveries.',
+  ctaDescription: 'Start shipping with us today and experience convenience at every step! Transparent rates, zero hidden surcharges, and direct doorstep delivery across Bangladesh.',
+  ctaContactBtnText: 'Contact',
+  ctaContactBtnLink: '#contact',
+  ctaTrackBtnText: 'Track Existing Shipment',
 
   mapLocationTitle: 'SAIN International Logistics',
   mapAddress: 'House 15, Road No. 5, Block B, Uttara-1230, Bangladesh',
@@ -128,7 +144,7 @@ export const ContactContentEditor: React.FC = () => {
         if (stored) {
           setConfig({ ...DEFAULT_CONTACT_CONFIG, ...JSON.parse(stored) });
         }
-      } catch {}
+      } catch { }
     };
 
     window.addEventListener('sain_site_config_updated', handleSync);
@@ -523,12 +539,99 @@ export const ContactContentEditor: React.FC = () => {
         </div>
 
         {/* ============================================================== */}
-        {/* 4. GOOGLE MAP LOCATION (Contact Page)                          */}
+        {/* 5. READY TO SHIP? PARALLAX CTA BANNER                          */}
         {/* ============================================================== */}
         <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-200 pb-2">
             <h4 className="text-xs font-bold uppercase tracking-wider text-[#1a6c7a] flex items-center gap-2">
-              <span>5. Google Map Location (Contact Page)</span>
+              <span>5. Ready To Ship? Parallax CTA Banner</span>
+            </h4>
+            <span className="text-[10px] bg-sky-100 text-sky-800 px-2 py-0.5 rounded font-bold">
+              Full-Width Parallax
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-500">
+            Customize the full-width parallax CTA banner displaying the maritime container ship located directly above the Contact &amp; Office locations section.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Eyebrow / Sub-tagline
+              </label>
+              <input
+                type="text"
+                value={config.ctaTagline || ''}
+                onChange={(e) => setConfig({ ...config, ctaTagline: e.target.value })}
+                className="w-full text-xs font-semibold border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a] bg-white"
+                placeholder="Ready To Ship? Let's Get Your Packages Moving!"
+              />
+            </div>
+          </div>
+
+          <RichParagraphEditor
+            value={config.ctaDescription || ''}
+            onChange={(newVal) => setConfig({ ...config, ctaDescription: newVal })}
+            label="CTA Description / Body Text"
+            placeholder="Start shipping with us today and experience convenience at every step! Transparent rates, zero hidden surcharges..."
+            helperText="Format description text with bold or italic emphasis."
+            minHeight="80px"
+            rows={3}
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Contact Button Text
+              </label>
+              <input
+                type="text"
+                value={config.ctaContactBtnText || ''}
+                onChange={(e) => setConfig({ ...config, ctaContactBtnText: e.target.value })}
+                className="w-full text-xs font-semibold border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a] bg-white"
+                placeholder="Contact"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Contact Button Link / Target
+              </label>
+              <input
+                type="text"
+                value={config.ctaContactBtnLink || ''}
+                onChange={(e) => setConfig({ ...config, ctaContactBtnLink: e.target.value })}
+                className="w-full text-xs font-mono border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a] bg-white"
+                placeholder="#contact"
+              />
+              <span className="text-[10px] text-slate-400 mt-1 block">
+                Use <code className="bg-slate-200 px-1 py-0.5 rounded text-[10px]">#contact</code> to scroll smoothly or enter a custom link.
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Tracking Button Text
+              </label>
+              <input
+                type="text"
+                value={config.ctaTrackBtnText || ''}
+                onChange={(e) => setConfig({ ...config, ctaTrackBtnText: e.target.value })}
+                className="w-full text-xs font-semibold border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-[#1a6c7a] bg-white"
+                placeholder="Track Existing Shipment"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ============================================================== */}
+        {/* 6. GOOGLE MAP LOCATION (Contact Page)                          */}
+        {/* ============================================================== */}
+        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#1a6c7a] flex items-center gap-2">
+              <span>6. Google Map Location (Contact Page)</span>
             </h4>
             <span className="text-[10px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-bold">
               Integrated Map
@@ -583,7 +686,7 @@ export const ContactContentEditor: React.FC = () => {
         </div>
 
         {/* ============================================================== */}
-        {/* 5. SMTP EMAIL NOTIFICATION CONFIGURATION                       */}
+        {/* 7. SMTP EMAIL NOTIFICATION CONFIGURATION                       */}
         {/* ============================================================== */}
         <div className="bg-gradient-to-br from-slate-900 to-[#0f1d26] p-6 rounded-2xl text-white space-y-5 border border-slate-800 shadow-xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-2">
@@ -593,7 +696,7 @@ export const ContactContentEditor: React.FC = () => {
               </div>
               <div>
                 <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                  <span>6. Contact Form SMTP Gateway Setup</span>
+                  <span>7. Contact Form SMTP Gateway Setup</span>
                   <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
                     Auto-Forward to Inbox
                   </span>
@@ -794,6 +897,12 @@ export const ContactContentEditor: React.FC = () => {
           onCancel={() => setConfirmModal(null)}
         />
       )}
+      {/* Centered Save Success Modal Popup */}
+      <SaveSuccessModal
+        isOpen={saved}
+        title="Contact Changes Saved!"
+        message="Contact information and office locations are now live across the website."
+      />
     </div>
   );
 };
