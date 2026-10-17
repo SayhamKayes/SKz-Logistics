@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, CheckCircle, Sparkles, Image, Upload, RotateCcw, Search, Package, ExternalLink, Phone } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
+import { SaveSuccessModal } from './SaveSuccessModal';
 import { saveSiteConfigToDb } from '../../services/siteConfigService';
 import { RichParagraphEditor } from './RichParagraphEditor';
 
@@ -18,6 +19,7 @@ export interface HeroConfig {
   trackingPlaceholder: string;
   whatsappNumber: string;
   whatsappDefaultMessage: string;
+  messengerUrl: string;
 }
 
 export const DEFAULT_HERO_CONFIG: HeroConfig = {
@@ -34,6 +36,7 @@ export const DEFAULT_HERO_CONFIG: HeroConfig = {
   trackingPlaceholder: 'Enter Consignment No. Ex: SAINEX067638406',
   whatsappNumber: '8801719068999',
   whatsappDefaultMessage: 'Hello SAIN International Logistics, I would like to inquire about freight & shipping services.',
+  messengerUrl: 'https://m.me/saininternationallogistics',
 };
 
 export const HomeContentEditor: React.FC = () => {
@@ -41,12 +44,16 @@ export const HomeContentEditor: React.FC = () => {
     try {
       const stored = localStorage.getItem('sain_hero_content_config');
       const directWhatsApp = localStorage.getItem('sain_whatsapp_number');
+      const directMessenger = localStorage.getItem('sain_messenger_url');
       let base = DEFAULT_HERO_CONFIG;
       if (stored) {
         base = { ...DEFAULT_HERO_CONFIG, ...JSON.parse(stored) };
       }
       if (directWhatsApp) {
         base.whatsappNumber = directWhatsApp;
+      }
+      if (directMessenger) {
+        base.messengerUrl = directMessenger;
       }
       return base;
     } catch {
@@ -71,12 +78,16 @@ export const HomeContentEditor: React.FC = () => {
       try {
         const stored = localStorage.getItem('sain_hero_content_config');
         const directWhatsApp = localStorage.getItem('sain_whatsapp_number');
+        const directMessenger = localStorage.getItem('sain_messenger_url');
         let base = DEFAULT_HERO_CONFIG;
         if (stored) {
           base = { ...DEFAULT_HERO_CONFIG, ...JSON.parse(stored) };
         }
         if (directWhatsApp) {
           base.whatsappNumber = directWhatsApp;
+        }
+        if (directMessenger) {
+          base.messengerUrl = directMessenger;
         }
         setConfig(base);
       } catch {}
@@ -117,6 +128,8 @@ export const HomeContentEditor: React.FC = () => {
     e.preventDefault();
     saveSiteConfigToDb('sain_hero_content_config', config);
     saveSiteConfigToDb('sain_whatsapp_number', config.whatsappNumber);
+    saveSiteConfigToDb('sain_messenger_url', config.messengerUrl);
+    localStorage.setItem('sain_messenger_url', config.messengerUrl);
     // Also sync to legacy home key for compatibility
     localStorage.setItem('sain_home_content_config', JSON.stringify({
       headline: config.headline,
@@ -125,6 +138,7 @@ export const HomeContentEditor: React.FC = () => {
     }));
     window.dispatchEvent(new Event('sain_hero_content_updated'));
     window.dispatchEvent(new Event('sain_whatsapp_updated'));
+    window.dispatchEvent(new Event('sain_messenger_updated'));
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
@@ -133,17 +147,20 @@ export const HomeContentEditor: React.FC = () => {
     setConfirmModal({
       isOpen: true,
       title: 'Reset Hero Section Content?',
-      message: 'Are you sure you want to reset all Hero Section text, headlines, descriptions, and WhatsApp configuration back to default values?',
+      message: 'Are you sure you want to reset all Hero Section text, headlines, descriptions, WhatsApp, and Messenger configuration back to default values?',
       confirmText: 'Reset to Defaults',
       type: 'warning',
       onConfirm: () => {
         setConfig(DEFAULT_HERO_CONFIG);
         localStorage.setItem('sain_hero_content_config', JSON.stringify(DEFAULT_HERO_CONFIG));
         localStorage.setItem('sain_whatsapp_number', DEFAULT_HERO_CONFIG.whatsappNumber);
+        localStorage.setItem('sain_messenger_url', DEFAULT_HERO_CONFIG.messengerUrl);
         saveSiteConfigToDb('sain_hero_content_config', DEFAULT_HERO_CONFIG);
         saveSiteConfigToDb('sain_whatsapp_number', DEFAULT_HERO_CONFIG.whatsappNumber);
+        saveSiteConfigToDb('sain_messenger_url', DEFAULT_HERO_CONFIG.messengerUrl);
         window.dispatchEvent(new Event('sain_hero_content_updated'));
         window.dispatchEvent(new Event('sain_whatsapp_updated'));
+        window.dispatchEvent(new Event('sain_messenger_updated'));
         setConfirmModal(null);
       },
     });
@@ -262,6 +279,69 @@ export const HomeContentEditor: React.FC = () => {
                 >
                   <span>Test WhatsApp Link</span>
                   <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ============================================================== */}
+        {/* 0.1 MESSENGER WIDGET & DIRECT INBOX CHAT SETTINGS             */}
+        {/* ============================================================== */}
+        <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-purple-50/40 p-5 rounded-2xl border-2 border-blue-300/80 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-blue-200/80 pb-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-blue-900 flex items-center gap-2">
+              <span className="p-1 rounded-md bg-gradient-to-tr from-[#0078FF] via-[#00B2FF] to-[#A033FF] text-white shadow-xs">
+                <svg viewBox="0 0 28 28" fill="currentColor" className="w-4 h-4">
+                  <path d="M14 2C7.373 2 2 7.14 2 13.48c0 3.61 1.776 6.837 4.56 8.91V26l3.447-1.892c1.233.342 2.544.529 3.993.529 6.627 0 12-5.14 12-11.48S20.627 2 14 2zm1.385 15.422l-3.219-3.433-6.28 3.433 6.908-7.333 3.296 3.433 6.203-3.433-6.877 7.333h-.031z" />
+                </svg>
+              </span>
+              <span>Facebook Messenger Widget &amp; Direct Chat Settings</span>
+            </h4>
+            <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-300 px-2 py-0.5 rounded font-bold">
+              Floating Speed-Dial Widget
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-800 mb-1">
+                Messenger Page URL / Username
+              </label>
+              <input
+                type="text"
+                value={config.messengerUrl || ''}
+                onChange={(e) =>
+                  setConfig({ ...config, messengerUrl: e.target.value })
+                }
+                className="w-full text-xs font-mono font-bold border-2 border-blue-300/80 rounded-lg px-3 py-2 outline-none focus:border-blue-500 bg-white shadow-xs"
+                placeholder="https://m.me/saininternationallogistics"
+                required
+              />
+              <span className="text-[10px] text-slate-500 mt-1 block">
+                Provide your Facebook page Messenger URL (e.g. <strong>https://m.me/saininternationallogistics</strong>) or username. Clicking the Messenger button in the floating Chat Widget opens this inbox directly.
+              </span>
+            </div>
+
+            <div className="flex flex-col justify-between">
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  Preview &amp; Testing
+                </label>
+                <p className="text-xs text-slate-600">
+                  Verify that your Messenger direct inbox link is working properly before deploying changes.
+                </p>
+              </div>
+
+              <div className="pt-2">
+                <a
+                  href={config.messengerUrl || 'https://m.me/saininternationallogistics'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-bold text-blue-700 hover:text-blue-900 inline-flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-blue-200 shadow-xs hover:border-blue-400 transition"
+                >
+                  <span>Test Messenger Link</span>
+                  <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
             </div>
@@ -533,6 +613,12 @@ export const HomeContentEditor: React.FC = () => {
           onCancel={() => setConfirmModal(null)}
         />
       )}
+      {/* Centered Save Success Modal Popup */}
+      <SaveSuccessModal
+        isOpen={saved}
+        title="Hero Changes Saved!"
+        message="Hero section and messenger configuration are now live across the website."
+      />
     </div>
   );
 };
