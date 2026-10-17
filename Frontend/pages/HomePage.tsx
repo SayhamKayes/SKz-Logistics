@@ -3,6 +3,7 @@ import { HeroTrackingExperience } from '../components/HeroTrackingExperience';
 import { ShipmentTimerSection } from '../components/ShipmentTimerSection';
 import { ServicesSection } from '../components/ServicesSection';
 import { AboutSection } from '../components/AboutSection';
+import { ReadyToShipSection } from '../components/ReadyToShipSection';
 import { ContactSection } from '../components/ContactSection';
 
 export const HomePage: React.FC = () => {
@@ -17,10 +18,13 @@ export const HomePage: React.FC = () => {
       {/* 3. Comprehensive Logistics Services */}
       <ServicesSection />
 
-      {/* 3. About SAIN, Mission, Vision, and Ready To Ship CTA */}
+      {/* 4. About SAIN, Mission, Vision */}
       <AboutSection />
 
-      {/* 4. Contact & Inquiries */}
+      {/* 5. Full-Width Ready To Ship Parallax CTA Banner */}
+      <ReadyToShipSection />
+
+      {/* 6. Contact & Inquiries */}
       <ContactSection />
     </div>
   );
