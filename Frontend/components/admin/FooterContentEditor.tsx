@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Save,
   CheckCircle,
@@ -107,6 +107,28 @@ export const FooterContentEditor: React.FC = () => {
     onConfirm: () => void;
   } | null>(null);
 
+  // Sync state whenever configuration is restored from History or updated externally
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const stored = localStorage.getItem(FOOTER_STORAGE_KEY);
+        if (stored) {
+          setConfig({ ...DEFAULT_FOOTER_CONFIG, ...JSON.parse(stored) });
+        }
+      } catch {}
+    };
+
+    window.addEventListener(FOOTER_UPDATE_EVENT, handleSync);
+    window.addEventListener('sain_site_config_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+
+    return () => {
+      window.removeEventListener(FOOTER_UPDATE_EVENT, handleSync);
+      window.removeEventListener('sain_site_config_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -156,7 +178,6 @@ export const FooterContentEditor: React.FC = () => {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem(FOOTER_STORAGE_KEY, JSON.stringify(config));
     saveSiteConfigToDb(FOOTER_STORAGE_KEY, config);
     window.dispatchEvent(new Event(FOOTER_UPDATE_EVENT));
     setSaved(true);
