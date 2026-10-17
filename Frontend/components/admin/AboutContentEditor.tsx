@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, CheckCircle, Info, Upload, Trash2, RotateCcw, Target, Compass, Award, TrendingUp, ShieldCheck, ExternalLink } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
+import { SaveSuccessModal } from './SaveSuccessModal';
 import { saveSiteConfigToDb } from '../../services/siteConfigService';
 import { RichParagraphEditor } from './RichParagraphEditor';
 
@@ -563,6 +564,12 @@ export const AboutContentEditor: React.FC = () => {
           onCancel={() => setConfirmModal(null)}
         />
       )}
+      {/* Centered Save Success Modal Popup */}
+      <SaveSuccessModal
+        isOpen={saved}
+        title="About Changes Saved!"
+        message="About Us content and values are now live across the website."
+      />
     </div>
   );
 };
