@@ -13,10 +13,11 @@ import {
   ChevronRight,
   PanelBottom,
   Clock,
+  History,
 } from 'lucide-react';
 import { getAdminInitials } from '../../utils/adminInitials';
 
-export type AdminSection = 'shipments' | 'timers' | 'home' | 'about' | 'services' | 'contact' | 'footer' | 'profile';
+export type AdminSection = 'shipments' | 'timers' | 'history' | 'home' | 'about' | 'services' | 'contact' | 'footer' | 'profile';
 
 interface AdminSidebarProps {
   currentSection: AdminSection;
@@ -42,6 +43,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     { id: 'contact', label: 'Contact & Branches', icon: Phone },
     { id: 'footer', label: 'Footer Section', icon: PanelBottom },
     { id: 'profile', label: 'Admin Profile & Security', icon: User },
+    { id: 'history', label: 'Activity & History', icon: History },
   ];
 
   return (
