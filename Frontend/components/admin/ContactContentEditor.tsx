@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Save,
   CheckCircle,
@@ -18,6 +18,7 @@ import {
 import { API_BASE_URL } from '../../services/databaseConfig';
 import { ConfirmModal } from './ConfirmModal';
 import { saveSiteConfigToDb } from '../../services/siteConfigService';
+import { RichParagraphEditor } from './RichParagraphEditor';
 
 export interface ContactConfig {
   // Header
@@ -119,13 +120,34 @@ export const ContactContentEditor: React.FC = () => {
     onConfirm: () => void;
   } | null>(null);
 
+  // Sync state when restored from History or updated externally
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const stored = localStorage.getItem('sain_contact_content_config');
+        if (stored) {
+          setConfig({ ...DEFAULT_CONTACT_CONFIG, ...JSON.parse(stored) });
+        }
+      } catch {}
+    };
+
+    window.addEventListener('sain_site_config_updated', handleSync);
+    window.addEventListener('sain_contact_content_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+
+    return () => {
+      window.removeEventListener('sain_site_config_updated', handleSync);
+      window.removeEventListener('sain_contact_content_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
   // SMTP Test state
   const [testLoading, setTestLoading] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('sain_contact_content_config', JSON.stringify(config));
     saveSiteConfigToDb('sain_contact_content_config', config);
     window.dispatchEvent(new Event('sain_contact_content_updated'));
     setSaved(true);
@@ -275,19 +297,15 @@ export const ContactContentEditor: React.FC = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Description / Subtext
-            </label>
-            <textarea
-              rows={2}
-              value={config.description}
-              onChange={(e) => setConfig({ ...config, description: e.target.value })}
-              className="w-full text-xs border border-slate-300 rounded-lg p-2.5 outline-none focus:border-[#1a6c7a] bg-white"
-              placeholder="Have questions regarding cargo rates from Guangzhou..."
-              required
-            />
-          </div>
+          <RichParagraphEditor
+            value={config.description}
+            onChange={(newVal) => setConfig({ ...config, description: newVal })}
+            label="Description / Subtext"
+            placeholder="Have questions regarding cargo rates from Guangzhou..."
+            helperText="Format branch & inquiry subtext with bold or italic emphasis."
+            minHeight="85px"
+            rows={3}
+          />
         </div>
 
         {/* ============================================================== */}
