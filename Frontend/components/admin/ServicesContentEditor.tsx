@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Save, CheckCircle, Truck, Plus, Trash2, Edit3, Upload, Image, X, ListPlus, ExternalLink } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { saveSiteConfigToDb } from '../../services/siteConfigService';
+import { RichParagraphEditor } from './RichParagraphEditor';
 
 export interface ServiceCard {
   id: string;
@@ -131,10 +132,45 @@ export const ServicesContentEditor: React.FC = () => {
     onConfirm: () => void;
   } | null>(null);
 
+  // Sync state when restored from History or updated externally
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const storedHeader = localStorage.getItem('sain_services_section_config');
+        if (storedHeader) {
+          setHeaderConfig({ ...DEFAULT_SERVICES_HEADER, ...JSON.parse(storedHeader) });
+        }
+        const storedCards = localStorage.getItem('sain_services_content_config');
+        if (storedCards) {
+          const parsed = JSON.parse(storedCards);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setCards(
+              parsed.map((item: any) => ({
+                id: item.id || `service-${Date.now()}`,
+                title: item.title || 'Untitled Service',
+                image: item.image || '/assets/images/air_freight.webp',
+                description: item.fullDescription || item.description || '',
+                features: Array.isArray(item.features) ? item.features : [],
+              }))
+            );
+          }
+        }
+      } catch {}
+    };
+
+    window.addEventListener('sain_site_config_updated', handleSync);
+    window.addEventListener('sain_services_content_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+
+    return () => {
+      window.removeEventListener('sain_site_config_updated', handleSync);
+      window.removeEventListener('sain_services_content_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
   // Save changes to localStorage & dispatch live update
   const persistChanges = (updatedCards: ServiceCard[], updatedHeader: ServicesSectionHeaderConfig) => {
-    localStorage.setItem('sain_services_content_config', JSON.stringify(updatedCards));
-    localStorage.setItem('sain_services_section_config', JSON.stringify(updatedHeader));
     saveSiteConfigToDb('sain_services_content_config', updatedCards);
     saveSiteConfigToDb('sain_services_section_config', updatedHeader);
     window.dispatchEvent(new Event('sain_services_content_updated'));
@@ -348,19 +384,15 @@ export const ServicesContentEditor: React.FC = () => {
           </div>
         </div>
 
-        <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1">
-            Section Subtitle / Description
-          </label>
-          <textarea
-            rows={2}
-            value={headerConfig.description}
-            onChange={(e) => setHeaderConfig({ ...headerConfig, description: e.target.value })}
-            className="w-full text-xs border border-slate-300 rounded-lg p-2.5 outline-none focus:border-[#1a6c7a] bg-white"
-            placeholder="From urgent documents to industrial bulk consignments..."
-            required
-          />
-        </div>
+        <RichParagraphEditor
+          value={headerConfig.description}
+          onChange={(newVal) => setHeaderConfig({ ...headerConfig, description: newVal })}
+          label="Section Subtitle / Description"
+          placeholder="From urgent documents to industrial bulk consignments..."
+          helperText="Format service section subtitle with bold or italic emphasis."
+          minHeight="85px"
+          rows={3}
+        />
       </form>
 
       {/* Part 2: Service Cards Management */}
@@ -554,19 +586,15 @@ export const ServicesContentEditor: React.FC = () => {
               </div>
 
               {/* Card Description */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Card Description (Shown on back when flipped)
-                </label>
-                <textarea
-                  rows={3}
-                  value={editingCard.description}
-                  onChange={(e) => setEditingCard({ ...editingCard, description: e.target.value })}
-                  className="w-full text-xs leading-relaxed border border-slate-300 rounded-xl p-3 outline-none focus:border-[#1a6c7a]"
-                  placeholder="Comprehensive service details shown after card flips on hover..."
-                  required
-                />
-              </div>
+              <RichParagraphEditor
+                value={editingCard.description}
+                onChange={(newVal) => setEditingCard({ ...editingCard, description: newVal })}
+                label="Card Description (Shown on back when flipped)"
+                placeholder="Comprehensive service details shown after card flips on hover..."
+                helperText="Select text and click Bold, Italic, or Underline to highlight key features."
+                minHeight="85px"
+                rows={3}
+              />
 
               {/* Key Points (Features list) */}
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
