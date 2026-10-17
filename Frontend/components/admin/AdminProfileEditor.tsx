@@ -40,22 +40,33 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>('Today at 22:15 BST');
 
-  // Load profile from localStorage on mount
+  // Load profile from localStorage on mount and sync on live changes/restore
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('sain_admin_profile');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.name) setName(parsed.name);
-        if (parsed.username) setUsername(parsed.username);
-        if (parsed.email) setEmail(parsed.email);
-        if (parsed.phone) setPhone(parsed.phone);
-        if (parsed.password) setStoredPassword(parsed.password);
-        if (parsed.lastUpdated) setLastUpdated(parsed.lastUpdated);
+    const handleSync = () => {
+      try {
+        const stored = localStorage.getItem('sain_admin_profile');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.name) setName(parsed.name);
+          if (parsed.username) setUsername(parsed.username);
+          if (parsed.email) setEmail(parsed.email);
+          if (parsed.phone) setPhone(parsed.phone);
+          if (parsed.password) setStoredPassword(parsed.password);
+          if (parsed.lastUpdated) setLastUpdated(parsed.lastUpdated);
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
-    }
+    };
+
+    handleSync();
+    window.addEventListener('sain_site_config_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+
+    return () => {
+      window.removeEventListener('sain_site_config_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
   }, []);
 
   const handleSaveProfile = (e: React.FormEvent) => {
@@ -106,7 +117,6 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
       lastUpdated: timestamp,
     };
 
-    localStorage.setItem('sain_admin_profile', JSON.stringify(updatedProfile));
     saveSiteConfigToDb('sain_admin_profile', updatedProfile);
     setStoredPassword(passwordToSave);
     setLastUpdated(timestamp);
