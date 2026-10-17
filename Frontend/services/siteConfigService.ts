@@ -6,6 +6,7 @@ export const CONFIG_KEYS = {
   SHIPMENT_TIMERS_HEADER: 'sain_shipment_timers_header_config',
   HERO_CONTENT: 'sain_hero_content_config',
   WHATSAPP_NUMBER: 'sain_whatsapp_number',
+  MESSENGER_URL: 'sain_messenger_url',
   SERVICES_CONTENT: 'sain_services_content_config',
   SERVICES_HEADER: 'sain_services_section_config',
   ABOUT_CONTENT: 'sain_about_content_config',
@@ -35,6 +36,13 @@ function recordConfigChangeHistory(key: string, data: any, previousData: any) {
       actionLabel = 'Updated WhatsApp';
       entityId = 'WhatsApp Contact';
       description = `Updated WhatsApp direct contact number to ${typeof data === 'string' ? data : JSON.stringify(data)}`;
+      break;
+    case CONFIG_KEYS.MESSENGER_URL:
+      module = 'home';
+      moduleLabel = 'Hero Section';
+      actionLabel = 'Updated Messenger';
+      entityId = 'Messenger Contact';
+      description = `Updated Facebook Messenger chat link to ${typeof data === 'string' ? data : JSON.stringify(data)}`;
       break;
     case CONFIG_KEYS.ABOUT_CONTENT:
       module = 'about';
