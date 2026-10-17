@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Save, CheckCircle, Info, Upload, Trash2, RotateCcw, Target, Compass, Award, TrendingUp, ShieldCheck, ExternalLink } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { saveSiteConfigToDb } from '../../services/siteConfigService';
+import { RichParagraphEditor } from './RichParagraphEditor';
 
 export interface AboutConfig {
   badge: string;
@@ -74,6 +75,26 @@ export const AboutContentEditor: React.FC = () => {
     onConfirm: () => void;
   } | null>(null);
 
+  // Sync state when restored from History or updated externally
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const stored = localStorage.getItem('sain_about_content_config');
+        if (stored) {
+          setConfig({ ...DEFAULT_ABOUT_CONFIG, ...JSON.parse(stored) });
+        }
+      } catch {}
+    };
+
+    window.addEventListener('sain_site_config_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+
+    return () => {
+      window.removeEventListener('sain_site_config_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -112,7 +133,6 @@ export const AboutContentEditor: React.FC = () => {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('sain_about_content_config', JSON.stringify(config));
     saveSiteConfigToDb('sain_about_content_config', config);
     window.dispatchEvent(new Event('sain_about_content_updated'));
     setSaved(true);
@@ -213,19 +233,15 @@ export const AboutContentEditor: React.FC = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Company Overview Description
-            </label>
-            <textarea
-              rows={3}
-              value={config.description}
-              onChange={(e) => setConfig({ ...config, description: e.target.value })}
-              className="w-full text-xs leading-relaxed border border-slate-300 rounded-lg p-3 outline-none focus:border-[#1a6c7a] bg-white"
-              placeholder="SAIN is a trusted shipping and courier company..."
-              required
-            />
-          </div>
+          <RichParagraphEditor
+            value={config.description}
+            onChange={(newVal) => setConfig({ ...config, description: newVal })}
+            label="Company Overview Description"
+            placeholder="SAIN is a trusted shipping and courier company..."
+            helperText="Select any portion of text and click Bold, Italic, or Underline to format just like Microsoft Word."
+            minHeight="90px"
+            rows={4}
+          />
         </div>
 
         {/* Section 2: Team / Office Showcase Image & Overlay */}
@@ -324,18 +340,15 @@ export const AboutContentEditor: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Image Overlay Description
-                </label>
-                <textarea
-                  rows={2}
-                  value={config.imageOverlayDesc}
-                  onChange={(e) => setConfig({ ...config, imageOverlayDesc: e.target.value })}
-                  className="w-full text-xs border border-slate-300 rounded-lg p-2.5 outline-none focus:border-[#1a6c7a] bg-white"
-                  placeholder="Connecting Guangzhou & global export hubs directly to Bangladesh consignees."
-                />
-              </div>
+              <RichParagraphEditor
+                value={config.imageOverlayDesc}
+                onChange={(newVal) => setConfig({ ...config, imageOverlayDesc: newVal })}
+                label="Image Overlay Description"
+                placeholder="Connecting Guangzhou & global export hubs directly to Bangladesh consignees."
+                helperText="Format overlay caption with bold or italic emphasis."
+                minHeight="70px"
+                rows={2}
+              />
             </div>
           </div>
         </div>
@@ -360,19 +373,15 @@ export const AboutContentEditor: React.FC = () => {
                 required
               />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Mission Description Text
-              </label>
-              <textarea
-                rows={3}
-                value={config.missionText}
-                onChange={(e) => setConfig({ ...config, missionText: e.target.value })}
-                className="w-full text-xs leading-relaxed border border-slate-300 rounded-lg p-3 outline-none focus:border-[#1a6c7a] bg-white"
-                placeholder="Our mission at SAIN INTERNATIONAL LOGISTICS..."
-                required
-              />
-            </div>
+            <RichParagraphEditor
+              value={config.missionText}
+              onChange={(newVal) => setConfig({ ...config, missionText: newVal })}
+              label="Mission Description Text"
+              placeholder="Our mission at SAIN INTERNATIONAL LOGISTICS..."
+              helperText="Highlight mission commitments with bold and italic typography."
+              minHeight="85px"
+              rows={3}
+            />
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -387,19 +396,16 @@ export const AboutContentEditor: React.FC = () => {
                 required
               />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Vision Description Text
-              </label>
-              <textarea
-                rows={2}
-                value={config.visionText}
-                onChange={(e) => setConfig({ ...config, visionText: e.target.value })}
-                className="w-full text-xs leading-relaxed border border-slate-300 rounded-lg p-3 outline-none focus:border-[#1a6c7a] bg-white"
-                placeholder="Our vision is to be the region's most trusted freight forwarding partner..."
-                required
-              />
-            </div>
+            
+            <RichParagraphEditor
+              value={config.visionText}
+              onChange={(newVal) => setConfig({ ...config, visionText: newVal })}
+              label="Vision Description Text"
+              placeholder="Our vision is to be the region's most trusted freight forwarding partner..."
+              helperText="Highlight vision highlights with bold and italic typography."
+              minHeight="85px"
+              rows={3}
+            />
           </div>
         </div>
 
@@ -423,14 +429,14 @@ export const AboutContentEditor: React.FC = () => {
                   required
                 />
               </div>
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">Description</label>
-                <textarea
-                  rows={2}
+              <div className="pt-1">
+                <RichParagraphEditor
                   value={config.value1Desc}
-                  onChange={(e) => setConfig({ ...config, value1Desc: e.target.value })}
-                  className="w-full text-xs border border-slate-300 rounded-lg p-2 outline-none focus:border-[#1a6c7a]"
-                  required
+                  onChange={(newVal) => setConfig({ ...config, value1Desc: newVal })}
+                  label="Description"
+                  placeholder="Value 1 description..."
+                  minHeight="65px"
+                  rows={2}
                 />
               </div>
             </div>
@@ -448,14 +454,14 @@ export const AboutContentEditor: React.FC = () => {
                   required
                 />
               </div>
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">Description</label>
-                <textarea
-                  rows={2}
+              <div className="pt-1">
+                <RichParagraphEditor
                   value={config.value2Desc}
-                  onChange={(e) => setConfig({ ...config, value2Desc: e.target.value })}
-                  className="w-full text-xs border border-slate-300 rounded-lg p-2 outline-none focus:border-[#1a6c7a]"
-                  required
+                  onChange={(newVal) => setConfig({ ...config, value2Desc: newVal })}
+                  label="Description"
+                  placeholder="Value 2 description..."
+                  minHeight="65px"
+                  rows={2}
                 />
               </div>
             </div>
@@ -473,14 +479,14 @@ export const AboutContentEditor: React.FC = () => {
                   required
                 />
               </div>
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">Description</label>
-                <textarea
-                  rows={2}
+              <div className="pt-1">
+                <RichParagraphEditor
                   value={config.value3Desc}
-                  onChange={(e) => setConfig({ ...config, value3Desc: e.target.value })}
-                  className="w-full text-xs border border-slate-300 rounded-lg p-2 outline-none focus:border-[#1a6c7a]"
-                  required
+                  onChange={(newVal) => setConfig({ ...config, value3Desc: newVal })}
+                  label="Description"
+                  placeholder="Value 3 description..."
+                  minHeight="65px"
+                  rows={2}
                 />
               </div>
             </div>
@@ -519,18 +525,15 @@ export const AboutContentEditor: React.FC = () => {
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Banner Subtext
-            </label>
-            <textarea
-              rows={2}
-              value={config.ctaDesc}
-              onChange={(e) => setConfig({ ...config, ctaDesc: e.target.value })}
-              className="w-full text-xs leading-relaxed border border-slate-300 rounded-lg p-3 outline-none focus:border-[#1a6c7a] bg-white"
-              required
-            />
-          </div>
+          <RichParagraphEditor
+            value={config.ctaDesc}
+            onChange={(newVal) => setConfig({ ...config, ctaDesc: newVal })}
+            label="Banner Subtext"
+            placeholder="Have consignments ready in China? Contact our cargo desk..."
+            helperText="Format CTA paragraph with bold or italic emphasis."
+            minHeight="75px"
+            rows={2}
+          />
         </div>
 
         {/* Save Bar */}
