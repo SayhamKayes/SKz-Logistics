@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, CheckCircle, Truck, Plus, Trash2, Edit3, Upload, Image, X, ListPlus, ExternalLink } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
+import { SaveSuccessModal } from './SaveSuccessModal';
 import { saveSiteConfigToDb } from '../../services/siteConfigService';
 import { RichParagraphEditor } from './RichParagraphEditor';
 
@@ -697,6 +698,12 @@ export const ServicesContentEditor: React.FC = () => {
           onCancel={() => setConfirmModal(null)}
         />
       )}
+      {/* Centered Save Success Modal Popup */}
+      <SaveSuccessModal
+        isOpen={saved}
+        title="Services Changes Saved!"
+        message="Freight service offerings and catalog cards are now live across the website."
+      />
     </div>
   );
 };
