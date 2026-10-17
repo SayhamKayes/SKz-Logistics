@@ -4,7 +4,7 @@ import { Footer } from '../components/Footer';
 import { TrackingModal } from '../components/TrackingModal';
 import { QuoteCalculatorModal } from '../components/QuoteCalculatorModal';
 import { BackendArchitectureDrawer } from '../components/BackendArchitectureDrawer';
-import { WhatsAppWidget } from '../components/WhatsAppWidget';
+import { ChatWidget } from '../components/ChatWidget';
 import { BackToTop } from '../components/BackToTop';
 
 import { useTracking } from '../Context/TrackingContext';
@@ -29,7 +29,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
       <TrackingModal />
       <QuoteCalculatorModal />
       <BackendArchitectureDrawer />
-      <WhatsAppWidget />
+      <ChatWidget />
       <BackToTop />
     </div>
   );
