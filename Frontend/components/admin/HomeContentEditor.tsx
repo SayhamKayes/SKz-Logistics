@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Save, CheckCircle, Sparkles, Image, Upload, RotateCcw, Search, Package, ExternalLink, Phone } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { saveSiteConfigToDb } from '../../services/siteConfigService';
+import { RichParagraphEditor } from './RichParagraphEditor';
 
 export interface HeroConfig {
   welcomeText: string;
@@ -64,6 +65,32 @@ export const HomeContentEditor: React.FC = () => {
     onConfirm: () => void;
   } | null>(null);
 
+  // Sync state when restored from History or updated externally
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const stored = localStorage.getItem('sain_hero_content_config');
+        const directWhatsApp = localStorage.getItem('sain_whatsapp_number');
+        let base = DEFAULT_HERO_CONFIG;
+        if (stored) {
+          base = { ...DEFAULT_HERO_CONFIG, ...JSON.parse(stored) };
+        }
+        if (directWhatsApp) {
+          base.whatsappNumber = directWhatsApp;
+        }
+        setConfig(base);
+      } catch {}
+    };
+
+    window.addEventListener('sain_site_config_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+
+    return () => {
+      window.removeEventListener('sain_site_config_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -88,8 +115,6 @@ export const HomeContentEditor: React.FC = () => {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('sain_hero_content_config', JSON.stringify(config));
-    localStorage.setItem('sain_whatsapp_number', config.whatsappNumber);
     saveSiteConfigToDb('sain_hero_content_config', config);
     saveSiteConfigToDb('sain_whatsapp_number', config.whatsappNumber);
     // Also sync to legacy home key for compatibility
@@ -385,19 +410,15 @@ export const HomeContentEditor: React.FC = () => {
             </span>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Hero Paragraph / Narrative Text
-            </label>
-            <textarea
-              rows={3}
-              value={config.description}
-              onChange={(e) => setConfig({ ...config, description: e.target.value })}
-              className="w-full text-xs leading-relaxed text-slate-800 border border-slate-300 rounded-lg p-3 outline-none focus:border-[#1a6c7a] bg-white"
-              placeholder="At SAIN we understand the importance of timely deliveries..."
-              required
-            />
-          </div>
+          <RichParagraphEditor
+            value={config.description}
+            onChange={(newVal) => setConfig({ ...config, description: newVal })}
+            label="Hero Paragraph / Narrative Text"
+            placeholder="At SAIN we understand the importance of timely deliveries..."
+            helperText="Select any portion of text and click Bold (Ctrl+B), Italic (Ctrl+I), or Underline (Ctrl+U) to style it just like Microsoft Word."
+            minHeight="95px"
+            rows={4}
+          />
         </div>
 
         {/* ============================================================== */}
@@ -473,19 +494,15 @@ export const HomeContentEditor: React.FC = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Tracking Section Subtitle / Description
-            </label>
-            <textarea
-              rows={2}
-              value={config.trackingDescription}
-              onChange={(e) => setConfig({ ...config, trackingDescription: e.target.value })}
-              className="w-full text-xs leading-relaxed text-slate-800 border border-slate-300 rounded-lg p-3 outline-none focus:border-[#1a6c7a] bg-white"
-              placeholder="Experience stress-free global freight visibility..."
-              required
-            />
-          </div>
+          <RichParagraphEditor
+            value={config.trackingDescription}
+            onChange={(newVal) => setConfig({ ...config, trackingDescription: newVal })}
+            label="Tracking Section Subtitle / Description"
+            placeholder="Experience stress-free global freight visibility..."
+            helperText="Select any portion of text and click Bold, Italic, or Underline to format tracking banner subtitle."
+            minHeight="80px"
+            rows={3}
+          />
         </div>
 
         {/* Save Bar */}
