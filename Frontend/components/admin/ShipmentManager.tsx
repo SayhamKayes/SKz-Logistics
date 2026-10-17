@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTracking } from '../../Context/TrackingContext';
 import { Consignment, PackageItem, ShipmentHistoryItem, getStatusProgressAndColor, buildConsignmentTimeline, normalizeStatus, getBangladeshDateTime } from '../../services/trackingData';
+import { recordAdminHistory } from '../../services/adminHistoryService';
 import { WaybillPrintModal } from './WaybillPrintModal';
 import { ConfirmModal } from './ConfirmModal';
 import {
@@ -744,6 +745,18 @@ export const ShipmentManager: React.FC = () => {
         setTrashedConsignments(updatedTrash);
         localStorage.setItem('sain_trashed_consignments', JSON.stringify(updatedTrash));
 
+        try {
+          recordAdminHistory({
+            module: 'shipments',
+            moduleLabel: 'Shipment Manager',
+            actionType: 'delete',
+            actionLabel: 'Moved to Trash',
+            entityId: consignmentNo,
+            description: `Moved consignment ${consignmentNo} to Recycle Bin (Trash).`,
+            snapshot: currentConsignment,
+          });
+        } catch {}
+
         setSaveSuccessMsg(`Consignment ${consignmentNo} moved to Trash (Recycle Bin).`);
         setTimeout(() => setSaveSuccessMsg(null), 3500);
 
@@ -768,6 +781,19 @@ export const ShipmentManager: React.FC = () => {
 
     setSelectedNo(noToRestore);
     setViewTab('active');
+
+    try {
+      recordAdminHistory({
+        module: 'shipments',
+        moduleLabel: 'Shipment Manager',
+        actionType: 'restore',
+        actionLabel: 'Restored from Trash',
+        entityId: noToRestore,
+        description: `Restored consignment ${noToRestore} from Recycle Bin back to Active Shipments.`,
+        snapshot: item.consignment,
+      });
+    } catch {}
+
     setSaveSuccessMsg(`Consignment ${noToRestore} has been successfully restored to Active Shipments!`);
     setTimeout(() => setSaveSuccessMsg(null), 3500);
   };
@@ -789,6 +815,18 @@ export const ShipmentManager: React.FC = () => {
         } catch (e) {
           console.warn('Failed to delete from database:', e);
         }
+
+        try {
+          recordAdminHistory({
+            module: 'shipments',
+            moduleLabel: 'Shipment Manager',
+            actionType: 'delete',
+            actionLabel: 'Permanently Deleted',
+            entityId: noToDelete,
+            description: `Permanently deleted consignment ${noToDelete} from the system database.`,
+          });
+        } catch {}
+
         setSaveSuccessMsg(`Consignment ${noToDelete} permanently deleted.`);
         setTimeout(() => setSaveSuccessMsg(null), 3000);
         setConfirmModal(null);
@@ -935,6 +973,31 @@ export const ShipmentManager: React.FC = () => {
       setTimeout(() => setStatusToast(null), 2000);
       setSaveSuccessMsg(`Bill ${updated.consignmentNo} updated successfully! Live tracking synchronized in real time.`);
       setTimeout(() => setSaveSuccessMsg(null), 4000);
+
+      // Record into Admin Activity History Memory
+      try {
+        const isNew = !allConsignments[cleanNo];
+        const statusChanged = currentConsignment && currentConsignment.status !== liveStatus;
+        const snapshotToRestore = isNew
+          ? { consignmentNo: cleanNo, isNewConsignment: true }
+          : currentConsignment || updated;
+
+        recordAdminHistory({
+          module: 'shipments',
+          moduleLabel: 'Shipment Manager',
+          actionType: isNew ? 'create' : statusChanged ? 'status_change' : 'update',
+          actionLabel: isNew ? 'Created Consignment' : statusChanged ? `Status: ${liveStatus}` : 'Updated Consignment',
+          entityId: cleanNo,
+          description: isNew
+            ? `Created new consignment ${cleanNo} (${packages.length} package(s), ${weightText}) for ${receiverName || 'Consignee'} with initial status "${liveStatus}".`
+            : statusChanged
+              ? `Status updated from "${currentConsignment?.status || 'Unknown'}" to "${liveStatus}" for consignment ${cleanNo} (Location: ${publishLocation || destination}).`
+              : `Updated shipment parameters, cargo details (${weightText}), and checkpoints for consignment ${cleanNo}.`,
+          snapshot: snapshotToRestore,
+        });
+      } catch (err) {
+        console.warn('Failed to record admin history:', err);
+      }
     } catch (err: any) {
       setSelectedNo(cleanNo);
       setStatusToast({
