@@ -89,6 +89,32 @@ export const ShipmentTimerManager: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Sync state when restored from History or updated externally
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const storedTimers = localStorage.getItem(TIMERS_STORAGE_KEY);
+        if (storedTimers) {
+          setTimers(JSON.parse(storedTimers));
+        }
+        const storedHeader = localStorage.getItem(TIMERS_HEADER_STORAGE_KEY);
+        if (storedHeader) {
+          setHeaderConfig(JSON.parse(storedHeader));
+        }
+      } catch {}
+    };
+
+    window.addEventListener('sain_site_config_updated', handleSync);
+    window.addEventListener(TIMERS_UPDATED_EVENT, handleSync);
+    window.addEventListener('storage', handleSync);
+
+    return () => {
+      window.removeEventListener('sain_site_config_updated', handleSync);
+      window.removeEventListener(TIMERS_UPDATED_EVENT, handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
   const handleUpdateTimer = (id: string, updates: Partial<ShipmentTimerItem>) => {
     setTimers((prev) =>
       prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
@@ -252,8 +278,6 @@ export const ShipmentTimerManager: React.FC = () => {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem(TIMERS_STORAGE_KEY, JSON.stringify(timers));
-    localStorage.setItem(TIMERS_HEADER_STORAGE_KEY, JSON.stringify(headerConfig));
     saveSiteConfigToDb(TIMERS_STORAGE_KEY, timers);
     saveSiteConfigToDb(TIMERS_HEADER_STORAGE_KEY, headerConfig);
     window.dispatchEvent(new Event(TIMERS_UPDATED_EVENT));
