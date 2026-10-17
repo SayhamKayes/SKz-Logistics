@@ -161,30 +161,6 @@ export const AboutSection: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {/* Ready to Ship CTA Banner */}
-        <div className="relative rounded-3xl overflow-hidden p-8 sm:p-12 bg-[#153243] text-white shadow-2xl">
-          <div className="max-w-3xl mx-auto text-center space-y-4">
-            <span className="inline-block text-xs font-bold uppercase tracking-widest text-amber-400">
-              {config.ctaTagline}
-            </span>
-            <h3 className="text-2xl sm:text-4xl font-black font-brand text-white leading-tight">
-              {config.ctaHeading}
-            </h3>
-            <p
-              className="text-slate-200 text-sm sm:text-base max-w-2xl mx-auto rich-text-content"
-              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(config.ctaDesc) }}
-            />
-            <div className="pt-2 flex flex-wrap items-center justify-center gap-4">
-              <button
-                onClick={() => openTrackingModal()}
-                className="px-6 py-3.5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase tracking-wider rounded-xl border border-white/20 transition flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <span>Track Existing Shipment</span>
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
     </section>
   );
