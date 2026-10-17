@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTracking } from '../Context/TrackingContext';
 import { AboutConfig, DEFAULT_ABOUT_CONFIG } from './admin/AboutContentEditor';
+import { sanitizeRichHtml } from '../utils/sanitizeHtml';
 import {
   Compass,
   Target,
@@ -62,9 +63,10 @@ export const AboutSection: React.FC = () => {
               return config.heading;
             })()}
           </h2>
-          <p className="text-slate-600 text-base sm:text-lg leading-relaxed">
-            {config.description}
-          </p>
+          <p
+            className="text-slate-600 text-base sm:text-lg leading-relaxed rich-text-content"
+            dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(config.description) }}
+          />
         </div>
 
         {/* Narrative & Visual Grid */}
@@ -87,9 +89,10 @@ export const AboutSection: React.FC = () => {
                     <MapPin className="w-3.5 h-3.5 text-amber-500" />
                     <span>{config.imageOverlayTitle}</span>
                   </div>
-                  <p className="text-slate-600 text-xs mt-1">
-                    {config.imageOverlayDesc}
-                  </p>
+                  <p
+                    className="text-slate-600 text-xs mt-1 rich-text-content"
+                    dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(config.imageOverlayDesc) }}
+                  />
                 </div>
               </div>
             </div>
@@ -106,9 +109,10 @@ export const AboutSection: React.FC = () => {
                   {config.missionTitle}
                 </h3>
               </div>
-              <p className="text-slate-600 text-sm leading-relaxed">
-                {config.missionText}
-              </p>
+              <p
+                className="text-slate-600 text-sm leading-relaxed rich-text-content"
+                dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(config.missionText) }}
+              />
             </div>
 
             <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/90 shadow-md space-y-4">
@@ -120,9 +124,10 @@ export const AboutSection: React.FC = () => {
                   {config.visionTitle}
                 </h3>
               </div>
-              <p className="text-slate-600 text-sm leading-relaxed">
-                {config.visionText}
-              </p>
+              <p
+                className="text-slate-600 text-sm leading-relaxed rich-text-content"
+                dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(config.visionText) }}
+              />
             </div>
 
             {/* Core Values 3-column pill */}
@@ -130,19 +135,28 @@ export const AboutSection: React.FC = () => {
               <div className="bg-white p-4 rounded-2xl border border-slate-200 text-center space-y-1 shadow-xs">
                 <Award className="w-5 h-5 text-amber-500 mx-auto" />
                 <h4 className="font-bold text-xs text-[#0f172a]">{config.value1Title}</h4>
-                <p className="text-[11px] text-slate-500">{config.value1Desc}</p>
+                <p
+                  className="text-[11px] text-slate-500 rich-text-content"
+                  dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(config.value1Desc) }}
+                />
               </div>
 
               <div className="bg-white p-4 rounded-2xl border border-slate-200 text-center space-y-1 shadow-xs">
                 <TrendingUp className="w-5 h-5 text-[#1a6c7a] mx-auto" />
                 <h4 className="font-bold text-xs text-[#0f172a]">{config.value2Title}</h4>
-                <p className="text-[11px] text-slate-500">{config.value2Desc}</p>
+                <p
+                  className="text-[11px] text-slate-500 rich-text-content"
+                  dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(config.value2Desc) }}
+                />
               </div>
 
               <div className="bg-white p-4 rounded-2xl border border-slate-200 text-center space-y-1 shadow-xs">
                 <ShieldCheck className="w-5 h-5 text-emerald-600 mx-auto" />
                 <h4 className="font-bold text-xs text-[#0f172a]">{config.value3Title}</h4>
-                <p className="text-[11px] text-slate-500">{config.value3Desc}</p>
+                <p
+                  className="text-[11px] text-slate-500 rich-text-content"
+                  dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(config.value3Desc) }}
+                />
               </div>
             </div>
           </div>
@@ -157,9 +171,10 @@ export const AboutSection: React.FC = () => {
             <h3 className="text-2xl sm:text-4xl font-black font-brand text-white leading-tight">
               {config.ctaHeading}
             </h3>
-            <p className="text-slate-200 text-sm sm:text-base max-w-2xl mx-auto">
-              {config.ctaDesc}
-            </p>
+            <p
+              className="text-slate-200 text-sm sm:text-base max-w-2xl mx-auto rich-text-content"
+              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(config.ctaDesc) }}
+            />
             <div className="pt-2 flex flex-wrap items-center justify-center gap-4">
               <button
                 onClick={() => openTrackingModal()}
