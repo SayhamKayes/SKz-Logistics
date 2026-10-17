@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useTracking } from '../Context/TrackingContext';
 import { SainLogo } from '../assets/Logo';
 import { HeroConfig, DEFAULT_HERO_CONFIG } from './admin/HomeContentEditor';
+import { sanitizeRichHtml } from '../utils/sanitizeHtml';
 import {
   ShieldCheck,
   MapPin,
@@ -388,9 +389,10 @@ export const HeroTrackingExperience: React.FC = () => {
                     return heroConfig.headline;
                   })()}
                 </h1>
-                <p className="text-slate-200 text-sm sm:text-base lg:text-lg leading-relaxed max-w-2xl font-normal drop-shadow-sm">
-                  {heroConfig.description}
-                </p>
+                <p
+                  className="text-slate-200 text-sm sm:text-base lg:text-lg leading-relaxed max-w-2xl font-normal drop-shadow-sm rich-text-content"
+                  dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(heroConfig.description) }}
+                />
               </div>
 
               {/* Right Column: Hero Quick Highlights Card & Verified Review */}
@@ -546,13 +548,12 @@ export const HeroTrackingExperience: React.FC = () => {
               </h2>
 
               <p
-                className="max-w-2xl mx-auto text-sm sm:text-base leading-relaxed transition-colors duration-200"
+                className="max-w-2xl mx-auto text-sm sm:text-base leading-relaxed transition-colors duration-200 rich-text-content"
                 style={{
                   color: whitePhase > 0.5 ? '#475569' : '#e2e8f0',
                 }}
-              >
-                {heroConfig.trackingDescription}
-              </p>
+                dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(heroConfig.trackingDescription) }}
+              />
             </div>
 
             {/* Tracking Card: Floats UP from the bottom smoothly (Image 2) */}
