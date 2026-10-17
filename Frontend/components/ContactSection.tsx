@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { DEFAULT_CONTACT_CONFIG, ContactConfig } from './admin/ContactContentEditor';
 import { API_BASE_URL } from '../services/databaseConfig';
+import { sanitizeRichHtml } from '../utils/sanitizeHtml';
 
 export const ContactSection: React.FC = () => {
   const [config, setConfig] = useState<ContactConfig>(() => {
@@ -135,9 +136,10 @@ export const ContactSection: React.FC = () => {
               return config.heading;
             })()}
           </h2>
-          <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
-            {config.description}
-          </p>
+          <p
+            className="text-slate-600 text-sm sm:text-base leading-relaxed rich-text-content"
+            dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(config.description) }}
+          />
         </div>
 
         {/* Info Grid + Contact Form */}
