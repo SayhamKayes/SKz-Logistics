@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { saveSiteConfigToDb } from '../../services/siteConfigService';
 import { getAdminInitials } from '../../utils/adminInitials';
+import { SaveSuccessModal } from './SaveSuccessModal';
 
 interface AdminProfileEditorProps {
   onProfileUpdated?: (updated: { name: string; username: string }) => void;
@@ -386,6 +387,12 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
           </button>
         </div>
       </form>
+      {/* Centered Save Success Modal Popup */}
+      <SaveSuccessModal
+        isOpen={message?.type === 'success'}
+        title="Profile Updated!"
+        message={message?.text || 'Profile details and credentials updated successfully.'}
+      />
     </div>
   );
 };
