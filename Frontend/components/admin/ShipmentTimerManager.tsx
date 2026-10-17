@@ -36,6 +36,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
+import { SaveSuccessModal } from './SaveSuccessModal';
 import { saveSiteConfigToDb } from '../../services/siteConfigService';
 
 const ITEMS_PER_PAGE = 10;
@@ -1044,6 +1045,12 @@ export const ShipmentTimerManager: React.FC = () => {
           onCancel={() => setConfirmModal(null)}
         />
       )}
+      {/* Centered Save Success Modal Popup */}
+      <SaveSuccessModal
+        isOpen={saved}
+        title="Timers Changes Saved!"
+        message="Active shipment timers and arrival schedules are now live across the website."
+      />
     </div>
   );
 };
