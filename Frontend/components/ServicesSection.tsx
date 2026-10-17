@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTracking } from '../Context/TrackingContext';
 import {
   DEFAULT_SERVICE_CARDS,
@@ -6,6 +6,7 @@ import {
   ServiceCard,
   ServicesSectionHeaderConfig,
 } from './admin/ServicesContentEditor';
+import { sanitizeRichHtml } from '../utils/sanitizeHtml';
 import {
   ShieldCheck,
   CheckCircle,
@@ -20,8 +21,23 @@ interface ServicesSectionProps {
 
 export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = false }) => {
   const { setActiveTab } = useTracking();
+  const [isPaused, setIsPaused] = useState(false);
+  const [withTransition, setWithTransition] = useState(true);
+  const [isSliding, setIsSliding] = useState(false);
 
-  // 1. Header config state
+  // Responsive cards to show
+  const [cardsToShow, setCardsToShow] = useState(() => {
+    if (typeof window !== 'undefined') {
+      if (window.innerWidth >= 1024) return 3;
+      if (window.innerWidth >= 768) return 2;
+    }
+    return 1;
+  });
+
+  // Drag & Swipe states
+  const [dragStartX, setDragStartX] = useState<number | null>(null);
+
+  // Header config state
   const [headerConfig, setHeaderConfig] = useState<ServicesSectionHeaderConfig>(() => {
     try {
       const stored = localStorage.getItem('sain_services_section_config');
@@ -30,7 +46,7 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
     return DEFAULT_SERVICES_HEADER;
   });
 
-  // 2. Services cards state
+  // Services cards state
   const [services, setServices] = useState<ServiceCard[]>(() => {
     try {
       const stored = localStorage.getItem('sain_services_content_config');
@@ -50,37 +66,39 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
     return DEFAULT_SERVICE_CARDS;
   });
 
-  const totalItems = services.length;
+  const baseCount = services.length;
 
-  // 3. Carousel sliding states (services is already initialized)
-  const [startIndex, setStartIndex] = useState<number>(() => (totalItems > 0 ? totalItems : 0));
-  const [isTransitioning, setIsTransitioning] = useState(true);
-  const [isHovered, setIsHovered] = useState(false);
-  const [activeFlippedCard, setActiveFlippedCard] = useState<string | null>(null);
+  // Tripled list for true seamless infinite continuous carousel looping
+  const clonedServices = React.useMemo(() => {
+    if (baseCount === 0) return [];
+    return [...services, ...services, ...services];
+  }, [services, baseCount]);
 
-  // Responsive visible cards count
-  const [visibleCount, setVisibleCount] = useState(3);
+  // Start in the middle copy
+  const [currentIndex, setCurrentIndex] = useState(baseCount);
 
+  // Keep currentIndex centered when services change
   useEffect(() => {
-    const updateVisible = () => {
-      if (typeof window === 'undefined') return;
+    setCurrentIndex(services.length);
+  }, [services.length]);
+
+  // Handle responsive resize for exact track translations
+  useEffect(() => {
+    const handleResize = () => {
       if (window.innerWidth >= 1024) {
-        setVisibleCount(3);
-      } else if (window.innerWidth >= 640) {
-        setVisibleCount(2);
+        setCardsToShow(3);
+      } else if (window.innerWidth >= 768) {
+        setCardsToShow(2);
       } else {
-        setVisibleCount(1);
+        setCardsToShow(1);
       }
     };
-    updateVisible();
-    window.addEventListener('resize', updateVisible);
-    return () => window.removeEventListener('resize', updateVisible);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Drag & Swipe states
-  const [dragStartX, setDragStartX] = useState<number | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-
+  // Listen for admin content updates
   useEffect(() => {
     const handleUpdate = () => {
       try {
@@ -111,114 +129,87 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
     };
   }, []);
 
-  // Tripled array for seamless infinite sliding
-  const clonedCards = useMemo(() => {
-    if (services.length === 0) return [];
-    return [...services, ...services, ...services];
-  }, [services]);
-
-  // Keep index synchronized if services count changes
+  // Seamless jump re-centering: re-enable CSS transition after instantaneous position reset
   useEffect(() => {
-    if (totalItems > 0 && startIndex < totalItems) {
-      setStartIndex(totalItems);
-    }
-  }, [totalItems, startIndex]);
-
-  const handlePrev = useCallback(() => {
-    if (totalItems <= 0) return;
-    setIsTransitioning(true);
-    setStartIndex((prev) => prev - 1);
-  }, [totalItems]);
-
-  const handleNext = useCallback(() => {
-    if (totalItems <= 0) return;
-    setIsTransitioning(true);
-    setStartIndex((prev) => prev + 1);
-  }, [totalItems]);
-
-  // Re-enable transition smoothly after instant loop resets
-  useEffect(() => {
-    if (!isTransitioning) {
+    if (!withTransition) {
       const raf = requestAnimationFrame(() => {
-        setIsTransitioning(true);
+        requestAnimationFrame(() => {
+          setWithTransition(true);
+        });
       });
       return () => cancelAnimationFrame(raf);
     }
-  }, [isTransitioning]);
+  }, [withTransition]);
+
+  // Safety timer to clear isSliding in case onTransitionEnd doesn't fire
+  useEffect(() => {
+    if (isSliding) {
+      const timer = setTimeout(() => {
+        setIsSliding(false);
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+  }, [isSliding]);
+
+  const handleNext = () => {
+    if (baseCount <= 1 || isSliding || !withTransition) return;
+    setIsSliding(true);
+    setCurrentIndex((prev) => prev + 1);
+  };
+
+  const handlePrev = () => {
+    if (baseCount <= 1 || isSliding || !withTransition) return;
+    setIsSliding(true);
+    setCurrentIndex((prev) => prev - 1);
+  };
 
   const handleTransitionEnd = () => {
-    if (totalItems <= 0) return;
-    if (startIndex >= totalItems * 2) {
-      setIsTransitioning(false);
-      setStartIndex((prev) => prev - totalItems);
-    } else if (startIndex < totalItems) {
-      setIsTransitioning(false);
-      setStartIndex((prev) => prev + totalItems);
+    setIsSliding(false);
+    if (baseCount <= 0) return;
+
+    // Passed the middle copy to the right -> silently reset back to middle copy
+    if (currentIndex >= baseCount * 2) {
+      setWithTransition(false);
+      setCurrentIndex((prev) => prev - baseCount);
+    }
+    // Moved before the middle copy to the left -> silently reset forward to middle copy
+    else if (currentIndex < baseCount) {
+      setWithTransition(false);
+      setCurrentIndex((prev) => prev + baseCount);
     }
   };
 
-  // Auto-play: moves 1 card smoothly every 2 seconds, paused on hover or drag
+  // Auto-play infinite continuous carousel: moves 1 slide smoothly every 1.5 seconds (1500ms)
   useEffect(() => {
-    if (fullGrid || isHovered || isDragging || totalItems <= 1) return;
+    if (fullGrid || isPaused || baseCount <= 1) return;
 
     const timer = setInterval(() => {
       handleNext();
-    }, 2000);
+    }, 1500);
 
     return () => clearInterval(timer);
-  }, [fullGrid, isHovered, isDragging, totalItems, handleNext]);
+  }, [fullGrid, isPaused, baseCount, isSliding, withTransition]);
 
-  // Drag / Swipe handlers
+  // Drag / Swipe handlers for mobile
   const handleTouchStart = (e: React.TouchEvent) => {
-    setIsHovered(true);
+    setIsPaused(true);
     setDragStartX(e.touches[0].clientX);
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (dragStartX === null) return;
-    const endX = e.changedTouches[0].clientX;
-    const diff = dragStartX - endX;
+    const diff = dragStartX - e.changedTouches[0].clientX;
     if (diff > 45) {
       handleNext();
     } else if (diff < -45) {
       handlePrev();
     }
     setDragStartX(null);
-    setIsHovered(false);
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
-    setIsHovered(true);
-    setDragStartX(e.clientX);
-  };
-
-  const handleMouseUp = (e: React.MouseEvent) => {
-    if (!isDragging || dragStartX === null) return;
-    const diff = dragStartX - e.clientX;
-    if (diff > 50) {
-      handleNext();
-    } else if (diff < -50) {
-      handlePrev();
-    }
-    setDragStartX(null);
-    setIsDragging(false);
-    setIsHovered(false);
-  };
-
-  const toggleCardFlip = (id: string) => {
-    setActiveFlippedCard((prev) => (prev === id ? null : id));
-  };
-
-  const activeDotIndex = totalItems > 0 ? ((startIndex % totalItems) + totalItems) % totalItems : 0;
-
-  const handleDotClick = (idx: number) => {
-    setIsTransitioning(true);
-    setStartIndex(totalItems + idx);
+    setIsPaused(false);
   };
 
   return (
-    <section id="services" className="relative py-16 px-4 sm:px-8 z-10 bg-white">
+    <section id="services" className="relative py-16 px-4 sm:px-8 z-10 bg-[#FFFFFF]" style={{ backgroundColor: '#FFFFFF' }}>
       <div className="max-w-7xl mx-auto space-y-12">
         {/* Section Header */}
         <div className="text-center space-y-4 max-w-3xl mx-auto">
@@ -243,9 +234,10 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
             })()}
           </h2>
 
-          <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
-            {headerConfig.description}
-          </p>
+          <p
+            className="text-slate-600 text-sm sm:text-base leading-relaxed rich-text-content"
+            dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(headerConfig.description) }}
+          />
         </div>
 
         {/* ============================================================== */}
@@ -254,108 +246,79 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
         {fullGrid ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {services.map((srv) => (
-              <ServiceFlipCard
-                key={srv.id}
-                service={srv}
-                isFlipped={activeFlippedCard === srv.id}
-                onToggleFlip={() => toggleCardFlip(srv.id)}
-              />
+              <ServiceFlipCard key={srv.id} service={srv} />
             ))}
           </div>
         ) : (
           /* ============================================================== */
-          /* CASE 2: CONTINUOUS BUTTERY SMOOTH SLIDING CAROUSEL (Home Page) */
+          /* CASE 2: SEAMLESS INFINITE LOOPING SLIDER (Home Page)           */
           /* ============================================================== */
           <div
             className="relative"
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
           >
-            {/* Slider Viewport with padding so shadows are not clipped */}
-            <div
-              className={`overflow-hidden py-4 -my-4 px-1 select-none cursor-grab ${
-                isDragging ? 'cursor-grabbing' : ''
-              }`}
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
-              onMouseDown={handleMouseDown}
-              onMouseUp={handleMouseUp}
-            >
+            {/* Cards Viewport + Navigation Arrows wrapper */}
+            <div className="relative">
+              {/* Slider Viewport */}
               <div
-                className="flex will-change-transform"
-                style={{
-                  transform: `translateX(-${startIndex * (100 / visibleCount)}%)`,
-                  transition: isTransitioning
-                    ? 'transform 700ms cubic-bezier(0.25, 1, 0.5, 1)'
-                    : 'none',
-                }}
-                onTransitionEnd={handleTransitionEnd}
+                className="overflow-hidden select-none py-8 px-1"
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
               >
-                {clonedCards.map((srv, cardIdx) => (
-                  <div
-                    key={`${srv.id}-${cardIdx}`}
-                    style={{ width: `${100 / visibleCount}%` }}
-                    className="flex-shrink-0 px-3 sm:px-4"
-                  >
-                    <ServiceFlipCard
-                      service={srv}
-                      isFlipped={activeFlippedCard === srv.id}
-                      onToggleFlip={() => toggleCardFlip(srv.id)}
-                    />
-                  </div>
-                ))}
+                <div
+                  className="flex -mx-3 sm:-mx-4"
+                  style={{
+                    transform: `translateX(-${currentIndex * (100 / cardsToShow)}%)`,
+                    transition: withTransition
+                      ? 'transform 600ms cubic-bezier(0.25, 1, 0.5, 1)'
+                      : 'none',
+                  }}
+                  onTransitionEnd={handleTransitionEnd}
+                >
+                  {clonedServices.map((srv, slideIdx) => (
+                    <div
+                      key={`${srv.id}-${slideIdx}`}
+                      className="shrink-0 w-full md:w-1/2 lg:w-1/3 px-3 sm:px-4"
+                    >
+                      <ServiceFlipCard service={srv} />
+                    </div>
+                  ))}
+                </div>
               </div>
+
+              {/* Carousel Navigation Arrows - Vertically Centered Across Middle of Cards */}
+              {baseCount > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handlePrev}
+                    aria-label="Previous service"
+                    className="absolute left-0 -translate-x-3 sm:-translate-x-6 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white text-slate-800 shadow-md border border-slate-200 flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer hover:bg-slate-50"
+                  >
+                    <ChevronLeft className="w-6 h-6 text-slate-700" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleNext}
+                    aria-label="Next service"
+                    className="absolute right-0 translate-x-3 sm:translate-x-6 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white text-slate-800 shadow-md border border-slate-200 flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer hover:bg-slate-50"
+                  >
+                    <ChevronRight className="w-6 h-6 text-slate-700" />
+                  </button>
+                </>
+              )}
             </div>
 
-            {/* Carousel Navigation Arrows */}
-            {totalItems > visibleCount && (
-              <>
-                <button
-                  type="button"
-                  onClick={handlePrev}
-                  aria-label="Previous service"
-                  className="absolute left-0 -translate-x-3 sm:-translate-x-6 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white text-slate-800 shadow-xl border border-slate-200 flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer hover:bg-slate-50"
-                >
-                  <ChevronLeft className="w-6 h-6 text-slate-700" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  aria-label="Next service"
-                  className="absolute right-0 translate-x-3 sm:translate-x-6 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white text-slate-800 shadow-xl border border-slate-200 flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer hover:bg-slate-50"
-                >
-                  <ChevronRight className="w-6 h-6 text-slate-700" />
-                </button>
-              </>
-            )}
-
-            {/* Slider Dots */}
-            {totalItems > 1 && (
-              <div className="flex items-center justify-center gap-2 pt-8">
-                {services.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleDotClick(idx)}
-                    aria-label={`Go to service ${idx + 1}`}
-                    className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
-                      activeDotIndex === idx
-                        ? 'w-8 bg-[#1a6c7a]'
-                        : 'w-2.5 bg-slate-300 hover:bg-slate-400'
-                    }`}
-                  />
-                ))}
-              </div>
-            )}
-
             {/* View All Button Under Slider */}
-            <div className="pt-10 text-center">
+            <div className="pt-8 text-center">
               <button
                 onClick={() => {
                   setActiveTab('services');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="inline-flex items-center gap-3 px-8 py-3.5 bg-[#1a6c7a] hover:bg-[#145561] text-white font-bold text-sm uppercase tracking-wider rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 group cursor-pointer active:scale-98"
+                className="inline-flex items-center gap-3 px-8 py-3.5 bg-[#1a6c7a] hover:bg-[#145561] text-white font-bold text-sm uppercase tracking-wider rounded-2xl shadow-md hover:shadow-lg transition-all duration-300 group cursor-pointer active:scale-98"
               >
                 <span>View All Services</span>
                 <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center group-hover:translate-x-1 transition-transform">
@@ -372,39 +335,43 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
 
 // ==============================================================================
 // 3D FLIP CARD COMPONENT
-// Front face: Clean, pure thumbnail image with unclipped natural drop shadow
-// Back face: Heading, description, and key points list
+// Front face: Clean, pure thumbnail image only (as requested by user)
+// Back face: Heading, description, and key points list (reveals on mouse hover or tap)
 // ==============================================================================
 interface ServiceFlipCardProps {
   service: ServiceCard;
-  isFlipped: boolean;
-  onToggleFlip: () => void;
 }
 
-const ServiceFlipCard: React.FC<ServiceFlipCardProps> = ({
-  service,
-  isFlipped,
-  onToggleFlip,
-}) => {
+const ServiceFlipCard: React.FC<ServiceFlipCardProps> = ({ service }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isClicked, setIsClicked] = useState(false);
+
+  const isFlipped = isHovered || isClicked;
+
   return (
     <div
-      className="perspective-1000 w-full h-[510px] group cursor-pointer select-none"
-      onClick={onToggleFlip}
+      className="perspective-1000 w-full h-[480px] group cursor-pointer select-none"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => {
+        setIsHovered(false);
+        setIsClicked(false);
+      }}
+      onClick={() => setIsClicked((prev) => !prev)}
     >
       <div
         className={`relative w-full h-full transition-transform duration-700 transform-style-3d rounded-3xl ${
-          isFlipped ? 'rotate-y-180' : 'group-hover:rotate-y-180'
+          isFlipped ? 'rotate-y-180' : ''
         }`}
       >
         {/* ============================================================== */}
-        {/* CARD FRONT FACE: Pure Full-Bleed Thumbnail Image (Unclipped)   */}
+        {/* CARD FRONT FACE: Pure Full-Bleed Thumbnail Image (No Text)     */}
         {/* ============================================================== */}
-        <div className="absolute inset-0 w-full h-full backface-hidden bg-slate-950 rounded-3xl overflow-hidden border border-slate-800/80 shadow-xl group-hover:shadow-2xl transition-all duration-300">
+        <div className="absolute inset-0 w-full h-full backface-hidden rounded-3xl overflow-hidden shadow-md border border-slate-100/80">
           {service.image ? (
             <img
               src={service.image}
               alt={service.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 rounded-3xl"
+              className="w-full h-full object-cover transition-transform duration-700 rounded-3xl"
               onError={(e) => {
                 (e.target as HTMLImageElement).src = '/assets/images/air_freight.webp';
               }}
@@ -418,9 +385,9 @@ const ServiceFlipCard: React.FC<ServiceFlipCardProps> = ({
         </div>
 
         {/* ============================================================== */}
-        {/* CARD BACK FACE: Revealed on 3D Flip (Heading, Desc, Key Points) */}
+        {/* CARD BACK FACE: Revealed on Hover (Heading, Desc, Key Points)   */}
         {/* ============================================================== */}
-        <div className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 bg-gradient-to-br from-[#0c1a24] via-[#153243] to-[#0c1a24] rounded-3xl p-7 text-white flex flex-col justify-between border-2 border-amber-500/40 shadow-2xl">
+        <div className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 bg-gradient-to-br from-[#0c1a24] via-[#153243] to-[#0c1a24] rounded-3xl p-7 text-white flex flex-col justify-between shadow-md border border-slate-700/60">
           <div className="space-y-4 overflow-y-auto pr-1">
             {/* Header */}
             <div className="border-b border-slate-700/80 pb-3">
@@ -433,9 +400,10 @@ const ServiceFlipCard: React.FC<ServiceFlipCardProps> = ({
             </div>
 
             {/* Description */}
-            <p className="text-slate-200 text-xs sm:text-sm leading-relaxed">
-              {service.description}
-            </p>
+            <p
+              className="text-slate-200 text-xs sm:text-sm leading-relaxed rich-text-content"
+              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(service.description) }}
+            />
 
             {/* Key Points / Features */}
             {service.features && service.features.length > 0 && (
@@ -463,4 +431,3 @@ const ServiceFlipCard: React.FC<ServiceFlipCardProps> = ({
     </div>
   );
 };
-
