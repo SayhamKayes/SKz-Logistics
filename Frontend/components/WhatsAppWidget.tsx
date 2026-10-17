@@ -1,7 +1,17 @@
 import React, { useState } from 'react';
 import { useWhatsAppConfig } from '../hooks/useWhatsApp';
 
-export const WhatsAppWidget: React.FC = () => {
+interface WhatsAppWidgetProps {
+  isFloating?: boolean;
+  onActionClick?: () => void;
+  className?: string;
+}
+
+export const WhatsAppWidget: React.FC<WhatsAppWidgetProps> = ({
+  isFloating = true,
+  onActionClick,
+  className = '',
+}) => {
   const [isHovered, setIsHovered] = useState(false);
   const { phoneNumber, defaultMessage } = useWhatsAppConfig();
 
@@ -10,7 +20,7 @@ export const WhatsAppWidget: React.FC = () => {
 
   return (
     <div
-      className="fixed bottom-22 right-6 z-40 flex items-center"
+      className={`flex items-center ${isFloating ? 'fixed bottom-22 right-6 z-40' : ''} ${className}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -29,6 +39,7 @@ export const WhatsAppWidget: React.FC = () => {
         href={whatsappUrl}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={onActionClick}
         title="Chat with SAIN International Logistics on WhatsApp"
         aria-label="Chat on WhatsApp"
         className="relative group p-3.5 bg-[#25D366] hover:bg-[#20ba5a] active:scale-95 text-white rounded-full shadow-2xl transition-all duration-300 flex items-center justify-center cursor-pointer"
