@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './databaseConfig';
+import { recordAdminHistory, ADMIN_HISTORY_STORAGE_KEY } from './adminHistoryService';
 
 export const CONFIG_KEYS = {
   SHIPMENT_TIMERS: 'sain_shipment_timers_config',
@@ -13,19 +14,161 @@ export const CONFIG_KEYS = {
   ADMIN_PROFILE: 'sain_admin_profile',
 } as const;
 
+function recordConfigChangeHistory(key: string, data: any, previousData: any) {
+  let module: any = 'system';
+  let moduleLabel = 'System Settings';
+  let actionLabel = 'Configuration Saved';
+  let entityId = key;
+  let description = `Saved configuration for ${key}`;
+
+  switch (key) {
+    case CONFIG_KEYS.HERO_CONTENT:
+      module = 'home';
+      moduleLabel = 'Hero Section';
+      actionLabel = 'Updated Hero Section';
+      entityId = 'Hero Content';
+      description = 'Saved changes to Hero Section banner, headings, and description';
+      break;
+    case CONFIG_KEYS.WHATSAPP_NUMBER:
+      module = 'home';
+      moduleLabel = 'Hero Section';
+      actionLabel = 'Updated WhatsApp';
+      entityId = 'WhatsApp Contact';
+      description = `Updated WhatsApp direct contact number to ${typeof data === 'string' ? data : JSON.stringify(data)}`;
+      break;
+    case CONFIG_KEYS.ABOUT_CONTENT:
+      module = 'about';
+      moduleLabel = 'About Us Section';
+      actionLabel = 'Updated About Us';
+      entityId = 'About Content';
+      description = 'Saved updates to company overview, values, and milestone story';
+      break;
+    case CONFIG_KEYS.SERVICES_CONTENT:
+      module = 'services';
+      moduleLabel = 'Services Catalog';
+      actionLabel = 'Updated Services';
+      entityId = 'Services Cards';
+      description = 'Saved updates to service offerings, freight cards, and features';
+      break;
+    case CONFIG_KEYS.SERVICES_HEADER:
+      module = 'services';
+      moduleLabel = 'Services Catalog';
+      actionLabel = 'Updated Services Header';
+      entityId = 'Services Header';
+      description = 'Saved changes to services section title and description';
+      break;
+    case CONFIG_KEYS.CONTACT_CONTENT:
+      module = 'contact';
+      moduleLabel = 'Contact & Branches';
+      actionLabel = 'Updated Branch Info';
+      entityId = 'Branch Directory';
+      description = 'Saved updates to contact details, branch hubs, and operational hours';
+      break;
+    case CONFIG_KEYS.FOOTER_CONTENT:
+      module = 'footer';
+      moduleLabel = 'Footer Section';
+      actionLabel = 'Updated Footer';
+      entityId = 'Footer CMS';
+      description = 'Saved changes to footer navigation, column titles, and links';
+      break;
+    case CONFIG_KEYS.SHIPMENT_TIMERS:
+      module = 'timers';
+      moduleLabel = 'Shipment Timers';
+      actionLabel = 'Updated Timers';
+      entityId = 'Inbound Schedules';
+      description = 'Saved changes to active arrival timers and scheduled flights/vessels';
+      break;
+    case CONFIG_KEYS.SHIPMENT_TIMERS_HEADER:
+      module = 'timers';
+      moduleLabel = 'Shipment Timers';
+      actionLabel = 'Updated Timers Header';
+      entityId = 'Timer Header';
+      description = 'Saved changes to shipment timer section header and badge';
+      break;
+    case CONFIG_KEYS.ADMIN_PROFILE:
+      module = 'profile';
+      moduleLabel = 'Admin Profile & Security';
+      actionLabel = 'Updated Profile';
+      entityId = 'Admin Credentials';
+      description = `Updated administrator profile settings for ${data?.username || 'admin'}`;
+      break;
+    default:
+      return; // Do not record unknown / internal keys
+  }
+
+  // The snapshot MUST be the state BEFORE this change was applied so clicking "Restore" reverts back to it!
+  const stateToRestore = previousData !== null && previousData !== undefined ? previousData : data;
+
+  recordAdminHistory({
+    module,
+    moduleLabel,
+    actionType: 'update',
+    actionLabel,
+    entityId,
+    description,
+    snapshot: stateToRestore,
+    details: {
+      summary: 'Previous configuration backed up. Click Restore to revert back to this state.',
+    },
+  });
+}
+
 /**
  * Persists a configuration payload both to localStorage (instant local cache)
  * and asynchronously to the Neon PostgreSQL database via Django DRF.
  */
-export async function saveSiteConfigToDb(key: string, data: any): Promise<boolean> {
-  // 1. Save to local storage for immediate offline/local fast retrieval
+export async function saveSiteConfigToDb(key: string, data: any, explicitPrevious?: any): Promise<boolean> {
+  // 1. Capture previous data BEFORE overwriting localStorage
+  let previousData = explicitPrevious;
+  if (previousData === undefined) {
+    try {
+      const existingRaw = localStorage.getItem(key);
+      if (existingRaw) {
+        try {
+          previousData = JSON.parse(existingRaw);
+        } catch {
+          previousData = existingRaw;
+        }
+      }
+    } catch {}
+  }
+
+  // Check if previous data is identical to new data
+  const isIdentical =
+    previousData !== null &&
+    previousData !== undefined &&
+    JSON.stringify(previousData) === JSON.stringify(data);
+
+  // 2. Save to local storage for immediate offline/local fast retrieval
   try {
     localStorage.setItem(key, typeof data === 'string' ? data : JSON.stringify(data));
   } catch (e) {
     console.warn(`[siteConfig] localStorage write error for ${key}:`, e);
   }
 
-  // 2. Persist to Neon PostgreSQL database
+  // 3. Auto-record to Admin Activity History Memory if key is an editable configuration
+  if (key !== ADMIN_HISTORY_STORAGE_KEY && !isIdentical) {
+    try {
+      recordConfigChangeHistory(key, data, previousData);
+    } catch (err) {
+      console.warn('[siteConfig] History logging error:', err);
+    }
+  }
+
+  // 4. Dispatch site config updated event so any active component can re-render immediately
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('sain_site_config_updated', { detail: { key, data } }));
+    window.dispatchEvent(new Event('storage'));
+    if (key === CONFIG_KEYS.FOOTER_CONTENT) window.dispatchEvent(new Event('sain_footer_content_updated'));
+    if (key === CONFIG_KEYS.HERO_CONTENT) window.dispatchEvent(new Event('sain_hero_content_updated'));
+    if (key === CONFIG_KEYS.WHATSAPP_NUMBER) window.dispatchEvent(new Event('sain_whatsapp_updated'));
+    if (key === CONFIG_KEYS.SERVICES_CONTENT || key === CONFIG_KEYS.SERVICES_HEADER) window.dispatchEvent(new Event('sain_services_content_updated'));
+    if (key === CONFIG_KEYS.ABOUT_CONTENT) window.dispatchEvent(new Event('sain_about_content_updated'));
+    if (key === CONFIG_KEYS.CONTACT_CONTENT) window.dispatchEvent(new Event('sain_contact_content_updated'));
+    if (key === CONFIG_KEYS.SHIPMENT_TIMERS || key === CONFIG_KEYS.SHIPMENT_TIMERS_HEADER) window.dispatchEvent(new Event('sain_shipment_timers_updated'));
+  }
+
+  // 5. Persist to Neon PostgreSQL database
   try {
     const res = await fetch(`${API_BASE_URL}/api/v1/config/${encodeURIComponent(key)}/`, {
       method: 'POST',
