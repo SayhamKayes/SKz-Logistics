@@ -5,6 +5,7 @@ import { AdminLogin } from '../components/admin/AdminLogin';
 import { AdminSidebar, AdminSection } from '../components/admin/AdminSidebar';
 import { ShipmentManager } from '../components/admin/ShipmentManager';
 import { ShipmentTimerManager } from '../components/admin/ShipmentTimerManager';
+import { AdminHistoryManager } from '../components/admin/AdminHistoryManager';
 import { HomeContentEditor } from '../components/admin/HomeContentEditor';
 import { AboutContentEditor } from '../components/admin/AboutContentEditor';
 import { ServicesContentEditor } from '../components/admin/ServicesContentEditor';
@@ -184,17 +185,19 @@ export const AdminPage: React.FC = () => {
                     ? 'Consignment Manager'
                     : currentSection === 'timers'
                       ? 'Shipment Timers & Inbound Schedules'
-                      : currentSection === 'home'
-                        ? 'Hero Section'
-                        : currentSection === 'about'
-                          ? 'About Us Content'
-                          : currentSection === 'services'
-                            ? 'Services Catalog'
-                            : currentSection === 'contact'
-                              ? 'Contact & Branches'
-                              : currentSection === 'footer'
-                                ? 'Footer Section'
-                                : 'Admin Profile'}
+                      : currentSection === 'history'
+                        ? 'Activity & History Memory'
+                        : currentSection === 'home'
+                          ? 'Hero Section'
+                          : currentSection === 'about'
+                            ? 'About Us Content'
+                            : currentSection === 'services'
+                              ? 'Services Catalog'
+                              : currentSection === 'contact'
+                                ? 'Contact & Branches'
+                                : currentSection === 'footer'
+                                  ? 'Footer Section'
+                                  : 'Admin Profile'}
                 </span>
               </div>
               <h1 className="text-base font-bold text-slate-900 leading-tight">
@@ -238,6 +241,7 @@ export const AdminPage: React.FC = () => {
         <div className="p-4 sm:p-6 lg:p-8 space-y-6">
           {currentSection === 'shipments' && <ShipmentManager />}
           {currentSection === 'timers' && <ShipmentTimerManager />}
+          {currentSection === 'history' && <AdminHistoryManager />}
           {currentSection === 'home' && <HomeContentEditor />}
           {currentSection === 'about' && <AboutContentEditor />}
           {currentSection === 'services' && <ServicesContentEditor />}
