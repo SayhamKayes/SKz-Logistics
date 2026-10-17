@@ -395,70 +395,24 @@ export const HeroTrackingExperience: React.FC = () => {
                 />
               </div>
 
-              {/* Right Column: Hero Quick Highlights Card & Verified Review */}
+              {/* Right Column: Global World Map SVG Route Illustration */}
               <div
-                className="lg:col-span-5 hidden lg:block space-y-4 transition-all duration-300 ease-out"
+                className="lg:col-span-5 hidden lg:flex items-center justify-center transition-all duration-500 ease-out"
                 style={{
                   opacity: heroCardsPhase,
                   transform: `translateX(${(1 - heroCardsPhase) * 45}px)`,
                   pointerEvents: heroCardsPhase > 0.5 ? 'auto' : 'none',
                 }}
               >
-                <div className="bg-slate-900/85 p-6 rounded-3xl border border-slate-700/80 shadow-2xl relative backdrop-blur-xl">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2.5 rounded-xl bg-teal-950/80 text-teal-300 border border-teal-500/40">
-                      <ShieldCheck className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-400">
-                        Trusted Logistics Partner
-                      </span>
-                      <h3 className="text-base font-bold text-white font-brand">
-                        Guangzhou to Dhaka Direct Route
-                      </h3>
-                    </div>
-                  </div>
-                  <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-                    Full customs handling and professional delivery under Bangladesh
-                    Customs Act 2023 guidelines. Swift cargo handling and real-time
-                    status updates.
-                  </p>
-                  <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-                    <span className="flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-amber-400" />
-                      <span className="text-slate-300">Uttara, Sector 11, Dhaka</span>
-                    </span>
-                    <span className="text-emerald-400 font-semibold">100% Insured</span>
-                  </div>
-                </div>
+                <div className="relative w-full max-w-lg lg:max-w-xl flex items-center justify-center p-2 group">
+                  {/* Subtle radiant background aura */}
+                  <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/15 via-teal-500/15 to-amber-400/20 blur-3xl rounded-full pointer-events-none" />
 
-                {/* Verified Testimonial Preview */}
-                <div className="bg-slate-900/85 p-5 rounded-2xl border border-slate-700/80 shadow-2xl backdrop-blur-xl">
-                  <div className="flex items-center justify-between text-xs mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 font-bold flex items-center justify-center text-[10px]">
-                        MS
-                      </div>
-                      <span className="font-bold text-white">MD SAKIB</span>
-                    </div>
-                    <div className="flex items-center text-amber-400">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          className="w-3.5 h-3.5 fill-amber-400 text-amber-400"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  <p className="text-slate-300 text-xs italic leading-relaxed">
-                    &ldquo;I recently utilized the services of SAIN International
-                    Logistics for an air freight shipment, and the experience was truly
-                    exemplary. From the very beginning, the team was incredibly
-                    transparent about the entire process.&rdquo;
-                  </p>
-                  <div className="mt-2 text-[11px] text-slate-400">
-                    Air Freight Client • Guangzhou to Dhaka
-                  </div>
+                  <img
+                    src="/assets/images/World map, Tallinn.svg"
+                    alt="SAIN International Logistics Global Route Network"
+                    className="relative z-10 w-full h-auto max-h-[460px] object-contain drop-shadow-[0_14px_38px_rgba(255,185,0,0.2)] select-none pointer-events-none transition-transform duration-700 hover:scale-105"
+                  />
                 </div>
               </div>
             </div>
