@@ -17,6 +17,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
+import { SaveSuccessModal } from './SaveSuccessModal';
 import { saveSiteConfigToDb } from '../../services/siteConfigService';
 import { RichParagraphEditor } from './RichParagraphEditor';
 import { sanitizeRichHtml } from '../../utils/sanitizeHtml';
@@ -647,6 +648,12 @@ export const FooterContentEditor: React.FC = () => {
           onCancel={() => setConfirmModal(null)}
         />
       )}
+      {/* Centered Save Success Modal Popup */}
+      <SaveSuccessModal
+        isOpen={saved}
+        title="Footer Changes Saved!"
+        message="Footer navigation, links, and contact information are now live across the website."
+      />
     </div>
   );
 };
