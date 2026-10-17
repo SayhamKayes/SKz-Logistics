@@ -16,6 +16,8 @@ interface RichParagraphEditorProps {
   placeholder?: string;
   label?: string;
   helperText?: string;
+  minHeight?: string;
+  rows?: number;
 }
 
 export const RichParagraphEditor: React.FC<RichParagraphEditorProps> = ({
@@ -24,6 +26,8 @@ export const RichParagraphEditor: React.FC<RichParagraphEditorProps> = ({
   placeholder = 'Type your paragraph here...',
   label = 'Company Description / Overview Paragraph',
   helperText = 'Select any portion of text and click Bold, Italic, or Underline to format just like Microsoft Word.',
+  minHeight = '100px',
+  rows = 4,
 }) => {
   const [isSourceMode, setIsSourceMode] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -286,13 +290,13 @@ export const RichParagraphEditor: React.FC<RichParagraphEditorProps> = ({
             onMouseUp={updateActiveFormats}
             onKeyDown={handleKeyDown}
             data-placeholder={placeholder}
-            className="w-full min-h-[110px] p-3 text-xs text-slate-800 leading-relaxed outline-none rich-footer-text bg-white"
-            style={{ minHeight: '110px' }}
+            className="w-full p-3 text-xs text-slate-800 leading-relaxed outline-none rich-footer-text rich-text-content bg-white"
+            style={{ minHeight }}
           />
         ) : (
           <textarea
             ref={textareaRef}
-            rows={5}
+            rows={rows}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             className="w-full p-3 font-mono text-xs bg-slate-900 text-amber-300 outline-none leading-relaxed resize-y border-0"
