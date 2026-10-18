@@ -15,10 +15,12 @@ import {
   Upload,
   Image as ImageIcon,
   ExternalLink,
+  Loader2,
 } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { SaveSuccessModal } from './SaveSuccessModal';
 import { saveSiteConfigToDb } from '../../services/siteConfigService';
+import { uploadMediaToCloudinary } from '../../services/uploadService';
 import { RichParagraphEditor } from './RichParagraphEditor';
 import { sanitizeRichHtml } from '../../utils/sanitizeHtml';
 
@@ -97,6 +99,7 @@ export const FooterContentEditor: React.FC = () => {
     return DEFAULT_FOOTER_CONFIG;
   });
 
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [saved, setSaved] = useState(false);
   const [newServiceInput, setNewServiceInput] = useState('');
   const [confirmModal, setConfirmModal] = useState<{
@@ -130,22 +133,41 @@ export const FooterContentEditor: React.FC = () => {
     };
   }, []);
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      alert('Logo file size must be under 2MB.');
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Logo file size must be under 10MB.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setConfig((prev) => ({ ...prev, brandLogoUrl: reader.result as string }));
+    setIsUploadingLogo(true);
+    try {
+      const res = await uploadMediaToCloudinary(file, 'sain_logistics/branding');
+      if (res.success && res.url) {
+        setConfig((prev) => ({ ...prev, brandLogoUrl: res.url! }));
+      } else {
+        console.warn('Cloudinary upload warning:', res.error);
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            setConfig((prev) => ({ ...prev, brandLogoUrl: reader.result as string }));
+          }
+        };
+        reader.readAsDataURL(file);
+        if (res.error && res.error.includes('credentials')) {
+          alert('Notice: Cloudinary credentials not yet added in Backend/.env. Saved as local preview. Add credentials in .env to upload directly to Cloudinary.');
+        } else {
+          alert(`Cloudinary upload notice: ${res.error || 'Failed to upload'}. Used local preview.`);
+        }
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error('Footer logo upload error:', err);
+    } finally {
+      setIsUploadingLogo(false);
+      e.target.value = '';
+    }
   };
 
   const handleResetLogo = () => {
@@ -279,13 +301,18 @@ export const FooterContentEditor: React.FC = () => {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <label className="flex-1 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer">
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Upload Logo</span>
+                <label className={`flex-1 py-2 px-3 ${isUploadingLogo ? 'bg-slate-300 cursor-not-allowed' : 'bg-slate-100 hover:bg-slate-200'} text-slate-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer`}>
+                  {isUploadingLogo ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="w-3.5 h-3.5" />
+                  )}
+                  <span>{isUploadingLogo ? 'Uploading to Cloudinary...' : 'Upload Logo'}</span>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleLogoUpload}
+                    disabled={isUploadingLogo}
                     className="hidden"
                   />
                 </label>
