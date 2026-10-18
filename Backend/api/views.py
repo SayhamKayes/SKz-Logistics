@@ -7,7 +7,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
 from django.contrib.auth.models import User
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
@@ -444,5 +445,85 @@ def site_config_detail(request, key):
             "updated_at": config.updated_at,
             "data": config.data
         }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def upload_media(request):
+    """
+    Uploads an image or media asset to Cloudinary.
+    Supports multipart/form-data file uploads and base64 strings.
+    """
+    try:
+        import cloudinary
+        import cloudinary.uploader
+    except ImportError:
+        return Response({
+            "success": False,
+            "error": "The 'cloudinary' package is not installed on the server."
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    # Check Cloudinary configuration
+    cloud_name = cloudinary.config().cloud_name
+    api_key = cloudinary.config().api_key
+    api_secret = cloudinary.config().api_secret
+
+    if not cloud_name or not api_key or not api_secret:
+        return Response({
+            "success": False,
+            "error": "Cloudinary credentials are not configured in Backend/.env. Please set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET."
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    file_obj = request.FILES.get('file') or request.FILES.get('image')
+    if not file_obj:
+        # Check if sent in JSON or form fields as base64 string or remote URL
+        file_obj = request.data.get('file') or request.data.get('image')
+
+    if not file_obj:
+        return Response({
+            "success": False,
+            "error": "No file or image payload was provided in the request."
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Resolve target destination folder in Cloudinary
+    env_folder = os.getenv('CLOUDINARY_FOLDER', '').strip()
+    req_folder = request.data.get('folder', '')
+    if isinstance(req_folder, list):
+        req_folder = req_folder[0] if req_folder else ''
+    req_folder = str(req_folder or '').strip()
+
+    if env_folder:
+        # If user configured a specific folder in .env, upload all media directly into that folder
+        use_subfolders = os.getenv('CLOUDINARY_USE_SUBFOLDERS', 'false').lower() in ['true', '1', 'yes']
+        if use_subfolders and req_folder:
+            sub = req_folder.replace('sain_logistics/', '').replace('sain_logistics', '').strip('/')
+            folder = f"{env_folder}/{sub}" if sub else env_folder
+        else:
+            folder = env_folder
+    else:
+        folder = req_folder or 'sain_logistics'
+
+    try:
+        upload_result = cloudinary.uploader.upload(
+            file_obj,
+            folder=folder,
+            resource_type='auto'
+        )
+
+        return Response({
+            "success": True,
+            "url": upload_result.get('secure_url'),
+            "public_id": upload_result.get('public_id'),
+            "format": upload_result.get('format'),
+            "bytes": upload_result.get('bytes'),
+            "resource_type": upload_result.get('resource_type'),
+            "created_at": upload_result.get('created_at'),
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({
+            "success": False,
+            "error": f"Cloudinary upload failed: {str(e)}"
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
