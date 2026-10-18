@@ -128,9 +128,25 @@ export const ShipmentTimerSection: React.FC = () => {
       id="shipment-schedules"
       className="relative py-10 sm:py-14 bg-gradient-to-b from-slate-900 via-[#0a151d] to-[#0f1d26] text-white overflow-hidden border-y border-slate-800"
     >
+      {/* Background Animated World Map Layer */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none select-none flex items-center justify-center">
+        {/* Animated Map Element with smooth continuous drift */}
+        <div className="w-[120%] sm:w-[110%] h-[120%] sm:h-[110%] flex-shrink-0 animate-world-map-drift opacity-[0.22] mix-blend-screen">
+          <img
+            src="/assets/images/World%20map,%20Tallinn.svg"
+            alt="Global Inbound Map Network"
+            className="w-full h-full object-cover object-center filter brightness-110 contrast-125 saturate-150 drop-shadow-[0_0_30px_rgba(26,108,122,0.35)]"
+          />
+        </div>
+
+        {/* Ambient Top & Bottom Vignette Overlays for flawless contrast and readability */}
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-900 via-transparent to-[#0f1d26] opacity-80" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(10,21,29,0.3)_0%,_rgba(10,21,29,0.85)_80%)]" />
+      </div>
+
       {/* Background ambient lighting effects */}
-      <div className="absolute top-0 left-1/4 w-80 h-80 bg-[#1a6c7a]/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#1a6c7a]/25 rounded-full blur-3xl pointer-events-none z-0" />
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-amber-500/15 rounded-full blur-3xl pointer-events-none z-0" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Compact Section Header */}
