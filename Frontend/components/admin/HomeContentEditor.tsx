@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Save, CheckCircle, Sparkles, Image, Upload, RotateCcw, Search, Package, ExternalLink, Phone } from 'lucide-react';
+import { Save, CheckCircle, Sparkles, Image, Upload, RotateCcw, Search, Package, ExternalLink, Phone, Loader2 } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { SaveSuccessModal } from './SaveSuccessModal';
 import { saveSiteConfigToDb } from '../../services/siteConfigService';
+import { uploadMediaToCloudinary } from '../../services/uploadService';
 import { RichParagraphEditor } from './RichParagraphEditor';
 
 export interface HeroConfig {
@@ -62,6 +63,7 @@ export const HomeContentEditor: React.FC = () => {
     return DEFAULT_HERO_CONFIG;
   });
 
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [saved, setSaved] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -102,22 +104,42 @@ export const HomeContentEditor: React.FC = () => {
     };
   }, []);
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      alert('Logo file size must be under 2MB.');
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Logo file size must be under 10MB.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setConfig((prev) => ({ ...prev, logoUrl: reader.result as string }));
+    setIsUploadingLogo(true);
+    try {
+      const res = await uploadMediaToCloudinary(file, 'sain_logistics/branding');
+      if (res.success && res.url) {
+        setConfig((prev) => ({ ...prev, logoUrl: res.url! }));
+      } else {
+        // Fallback to local preview if Cloudinary credentials are not configured
+        console.warn('Cloudinary upload warning:', res.error);
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            setConfig((prev) => ({ ...prev, logoUrl: reader.result as string }));
+          }
+        };
+        reader.readAsDataURL(file);
+        if (res.error && res.error.includes('credentials')) {
+          alert('Notice: Cloudinary credentials not yet added in Backend/.env. Saved as local preview. Add credentials in .env to upload directly to Cloudinary.');
+        } else {
+          alert(`Cloudinary upload notice: ${res.error || 'Failed to upload'}. Used local preview.`);
+        }
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error('Logo upload error:', err);
+    } finally {
+      setIsUploadingLogo(false);
+      e.target.value = '';
+    }
   };
 
   const handleResetLogo = () => {
@@ -412,13 +434,18 @@ export const HomeContentEditor: React.FC = () => {
 
               <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-2">
-                  <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1a6c7a] hover:bg-[#145561] text-white text-xs font-bold rounded-lg shadow-xs transition">
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Upload New Logo</span>
+                  <label className={`cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 ${isUploadingLogo ? 'bg-slate-400 cursor-not-allowed' : 'bg-[#1a6c7a] hover:bg-[#145561]'} text-white text-xs font-bold rounded-lg shadow-xs transition`}>
+                    {isUploadingLogo ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="w-3.5 h-3.5" />
+                    )}
+                    <span>{isUploadingLogo ? 'Uploading to Cloudinary...' : 'Upload New Logo'}</span>
                     <input
                       type="file"
                       accept="image/*"
                       onChange={handleLogoUpload}
+                      disabled={isUploadingLogo}
                       className="hidden"
                     />
                   </label>
