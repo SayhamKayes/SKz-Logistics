@@ -56,7 +56,7 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
           return parsed.map((item: any) => ({
             id: item.id || `service-${Date.now()}`,
             title: item.title || 'Untitled Service',
-            image: item.image || '/assets/images/air_freight.webp',
+            image: item.image || '',
             description: item.fullDescription || item.description || '',
             features: Array.isArray(item.features) ? item.features : [],
           }));
