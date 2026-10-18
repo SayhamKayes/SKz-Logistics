@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SainLogo } from '../assets/Logo';
 import { useTracking } from '../Context/TrackingContext';
 import {
@@ -25,6 +25,44 @@ export const Navbar: React.FC = () => {
     setDevDbModalOpen,
   } = useTracking();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [customLogo, setCustomLogo] = useState<string | null>(() => {
+    try {
+      const hero = localStorage.getItem('sain_hero_content_config');
+      if (hero) {
+        const parsed = JSON.parse(hero);
+        if (parsed.logoUrl && parsed.logoUrl !== '/assets/images/SAIN_logo_gold.png') {
+          return parsed.logoUrl;
+        }
+      }
+    } catch {}
+    return null;
+  });
+
+  useEffect(() => {
+    const handleSyncLogo = () => {
+      try {
+        const hero = localStorage.getItem('sain_hero_content_config');
+        if (hero) {
+          const parsed = JSON.parse(hero);
+          if (parsed.logoUrl && parsed.logoUrl !== '/assets/images/SAIN_logo_gold.png') {
+            setCustomLogo(parsed.logoUrl);
+            return;
+          }
+        }
+        setCustomLogo(null);
+      } catch {}
+    };
+
+    window.addEventListener('sain_hero_content_updated', handleSyncLogo);
+    window.addEventListener('sain_site_config_updated', handleSyncLogo);
+    window.addEventListener('storage', handleSyncLogo);
+
+    return () => {
+      window.removeEventListener('sain_hero_content_updated', handleSyncLogo);
+      window.removeEventListener('sain_site_config_updated', handleSyncLogo);
+      window.removeEventListener('storage', handleSyncLogo);
+    };
+  }, []);
 
   const showNavbar = activeTab !== 'home' || isHeaderVisible;
 
@@ -57,7 +95,16 @@ export const Navbar: React.FC = () => {
             onClick={() => handleNavClick('home')}
             className="cursor-pointer transition-transform hover:scale-[1.01]"
           >
-            <SainLogo variant="full" />
+            {customLogo ? (
+              <img
+                src={customLogo}
+                alt="SAIN International Logistics"
+                className="h-9 sm:h-11 w-auto object-contain max-w-[220px] sm:max-w-[260px]"
+                onError={() => setCustomLogo(null)}
+              />
+            ) : (
+              <SainLogo variant="full" />
+            )}
           </div>
 
           {/* Desktop Navigation Links */}
