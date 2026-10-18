@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Save, CheckCircle, Truck, Plus, Trash2, Edit3, Upload, Image, X, ListPlus, ExternalLink } from 'lucide-react';
+import { Save, CheckCircle, Truck, Plus, Trash2, Edit3, Upload, Image, X, ListPlus, ExternalLink, Loader2 } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { SaveSuccessModal } from './SaveSuccessModal';
 import { saveSiteConfigToDb } from '../../services/siteConfigService';
+import { uploadMediaToCloudinary } from '../../services/uploadService';
 import { RichParagraphEditor } from './RichParagraphEditor';
 
 export interface ServiceCard {
@@ -108,7 +109,7 @@ export const ServicesContentEditor: React.FC = () => {
           return parsed.map((item: any) => ({
             id: item.id || `service-${Date.now()}`,
             title: item.title || 'Untitled Service',
-            image: item.image || '/assets/images/air_freight.webp',
+            image: item.image || '',
             description: item.fullDescription || item.description || '',
             features: Array.isArray(item.features) ? item.features : [],
           }));
@@ -122,6 +123,7 @@ export const ServicesContentEditor: React.FC = () => {
   const [isEditingCard, setIsEditingCard] = useState(false);
   const [editingCard, setEditingCard] = useState<ServiceCard | null>(null);
   const [isNewCard, setIsNewCard] = useState(false);
+  const [isUploadingCardImage, setIsUploadingCardImage] = useState(false);
   const [newFeatureInput, setNewFeatureInput] = useState('');
   const [saved, setSaved] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
@@ -219,22 +221,41 @@ export const ServicesContentEditor: React.FC = () => {
     });
   };
 
-  const handleCardImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCardImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !editingCard) return;
 
-    if (file.size > 4 * 1024 * 1024) {
-      alert('Image file size must be under 4MB.');
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image file size must be under 10MB.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setEditingCard({ ...editingCard, image: reader.result as string });
+    setIsUploadingCardImage(true);
+    try {
+      const res = await uploadMediaToCloudinary(file, 'sain_logistics/services');
+      if (res.success && res.url) {
+        setEditingCard({ ...editingCard, image: res.url! });
+      } else {
+        console.warn('Cloudinary upload warning:', res.error);
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            setEditingCard({ ...editingCard, image: reader.result as string });
+          }
+        };
+        reader.readAsDataURL(file);
+        if (res.error && res.error.includes('credentials')) {
+          alert('Notice: Cloudinary credentials not yet added in Backend/.env. Saved as local preview. Add credentials in .env to upload directly to Cloudinary.');
+        } else {
+          alert(`Cloudinary upload notice: ${res.error || 'Failed to upload'}. Used local preview.`);
+        }
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error('Card image upload error:', err);
+    } finally {
+      setIsUploadingCardImage(false);
+      e.target.value = '';
+    }
   };
 
   const handleRemoveCardImage = () => {
@@ -553,13 +574,18 @@ export const ServicesContentEditor: React.FC = () => {
 
                   <div className="flex-1 space-y-2 w-full">
                     <div className="flex items-center gap-2">
-                      <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1a6c7a] hover:bg-[#145561] text-white text-xs font-bold rounded-lg shadow-xs transition">
-                        <Upload className="w-3.5 h-3.5" />
-                        <span>Upload Image File</span>
+                      <label className={`cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 ${isUploadingCardImage ? 'bg-slate-400 cursor-not-allowed' : 'bg-[#1a6c7a] hover:bg-[#145561]'} text-white text-xs font-bold rounded-lg shadow-xs transition`}>
+                        {isUploadingCardImage ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Upload className="w-3.5 h-3.5" />
+                        )}
+                        <span>{isUploadingCardImage ? 'Uploading to Cloudinary...' : 'Upload Image File'}</span>
                         <input
                           type="file"
                           accept="image/*"
                           onChange={handleCardImageUpload}
+                          disabled={isUploadingCardImage}
                           className="hidden"
                         />
                       </label>
