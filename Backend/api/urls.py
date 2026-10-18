@@ -7,6 +7,7 @@ from .views import (
     reset_password,
     get_all_site_configs,
     site_config_detail,
+    upload_media,
 )
 
 urlpatterns = [
@@ -17,4 +18,5 @@ urlpatterns = [
     path('auth/reset-password/', reset_password, name='auth-reset-password'),
     path('config/', get_all_site_configs, name='site-config-list'),
     path('config/<str:key>/', site_config_detail, name='site-config-detail'),
+    path('upload/', upload_media, name='upload-media'),
 ]
