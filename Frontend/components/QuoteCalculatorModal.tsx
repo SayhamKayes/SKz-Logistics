@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTracking } from '../Context/TrackingContext';
 import {
   X,
@@ -14,10 +14,45 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useWhatsAppConfig } from '../hooks/useWhatsApp';
+import { fetchSiteConfigFromDb, CONFIG_KEYS } from '../services/siteConfigService';
+
+export interface LogisticsRates {
+  airPerKg: number;
+  seaLclPerCbm: number;
+  seaFclBase: number;
+  handCarryBase: number;
+  handCarryPerKg: number;
+  customsFee: number;
+  usdBdtRate: number;
+}
+
+export const DEFAULT_LOGISTICS_RATES: LogisticsRates = {
+  airPerKg: 7.5,
+  seaLclPerCbm: 165,
+  seaFclBase: 1850,
+  handCarryBase: 420,
+  handCarryPerKg: 14,
+  customsFee: 35,
+  usdBdtRate: 122,
+};
 
 export const QuoteCalculatorModal: React.FC = () => {
   const { phoneNumber } = useWhatsAppConfig();
   const { isQuoteModalOpen, closeQuoteModal } = useTracking();
+
+  const [rates, setRates] = useState<LogisticsRates>(() => {
+    try {
+      const stored = localStorage.getItem('sain_logistics_rates_config');
+      if (stored) return { ...DEFAULT_LOGISTICS_RATES, ...JSON.parse(stored) };
+    } catch {}
+    return DEFAULT_LOGISTICS_RATES;
+  });
+
+  useEffect(() => {
+    fetchSiteConfigFromDb<LogisticsRates>(CONFIG_KEYS.LOGISTICS_RATES, DEFAULT_LOGISTICS_RATES).then((remote) => {
+      if (remote) setRates((prev) => ({ ...prev, ...remote }));
+    });
+  }, []);
 
   const [freightType, setFreightType] = useState<'air' | 'sea_lcl' | 'sea_fcl' | 'hand_carry'>('air');
   const [origin, setOrigin] = useState('Guangzhou');
@@ -31,24 +66,21 @@ export const QuoteCalculatorModal: React.FC = () => {
   // Realistic logistics rate calculation
   const calculateEstimate = () => {
     let baseRateUsd = 0;
-    let customsFeeUsd = includeCustoms ? 35 : 0;
+    let customsFeeUsd = includeCustoms ? rates.customsFee : 0;
 
     if (freightType === 'air') {
-      // ~$7.50 / kg from Guangzhou to Dhaka air freight
       const effectiveWeight = Math.max(weightKg, volumeCbm * 167);
-      baseRateUsd = effectiveWeight * 7.5;
+      baseRateUsd = effectiveWeight * rates.airPerKg;
     } else if (freightType === 'sea_lcl') {
-      // ~$160 / CBM
-      baseRateUsd = Math.max(volumeCbm, 0.5) * 165;
+      baseRateUsd = Math.max(volumeCbm, 0.5) * rates.seaLclPerCbm;
     } else if (freightType === 'sea_fcl') {
-      // Standard 20ft container rate
-      baseRateUsd = 1850;
+      baseRateUsd = rates.seaFclBase;
     } else if (freightType === 'hand_carry') {
-      baseRateUsd = 420 + weightKg * 14;
+      baseRateUsd = rates.handCarryBase + weightKg * rates.handCarryPerKg;
     }
 
     const totalUsd = Math.round(baseRateUsd + customsFeeUsd);
-    const totalBdt = Math.round(totalUsd * 122); // current approx USD-BDT rate
+    const totalBdt = Math.round(totalUsd * rates.usdBdtRate);
     return { totalUsd, totalBdt };
   };
 
