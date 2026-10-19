@@ -15,10 +15,10 @@ import {
   AlertCircle,
   ExternalLink,
 } from 'lucide-react';
-import { API_BASE_URL } from '../../services/databaseConfig';
+import { getApiBaseUrl } from '../../services/databaseConfig';
 import { ConfirmModal } from './ConfirmModal';
 import { SaveSuccessModal } from './SaveSuccessModal';
-import { saveSiteConfigToDb } from '../../services/siteConfigService';
+import { saveSiteConfigToDb, fetchSiteConfigFromDb, CONFIG_KEYS } from '../../services/siteConfigService';
 import { RichParagraphEditor } from './RichParagraphEditor';
 
 export interface ContactConfig {
@@ -125,7 +125,17 @@ export const ContactContentEditor: React.FC = () => {
     return DEFAULT_CONTACT_CONFIG;
   });
 
-  const [saved, setSaved] = useState(false);
+  const [saveModal, setSaveModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'warning' | 'error';
+  }>({
+    isOpen: false,
+    title: 'Contact Changes Saved!',
+    message: 'Contact information and office locations are now live across the website.',
+    type: 'success',
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -136,8 +146,14 @@ export const ContactContentEditor: React.FC = () => {
     onConfirm: () => void;
   } | null>(null);
 
-  // Sync state when restored from History or updated externally
+  // Sync state when restored from History or updated externally, and fetch from Central DB on mount
   useEffect(() => {
+    fetchSiteConfigFromDb<ContactConfig>(CONFIG_KEYS.CONTACT_CONTENT, DEFAULT_CONTACT_CONFIG).then((remote) => {
+      if (remote) {
+        setConfig((prev) => ({ ...prev, ...remote }));
+      }
+    });
+
     const handleSync = () => {
       try {
         const stored = localStorage.getItem('sain_contact_content_config');
@@ -162,12 +178,28 @@ export const ContactContentEditor: React.FC = () => {
   const [testLoading, setTestLoading] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveSiteConfigToDb('sain_contact_content_config', config);
+    localStorage.setItem('sain_contact_content_config', JSON.stringify(config));
     window.dispatchEvent(new Event('sain_contact_content_updated'));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+
+    const res = await saveSiteConfigToDb(CONFIG_KEYS.CONTACT_CONTENT, config);
+    if (res.success) {
+      setSaveModal({
+        isOpen: true,
+        title: 'Contact Changes Saved!',
+        message: 'Contact information and office locations are saved to Central Neon Database and live across all devices.',
+        type: 'success',
+      });
+    } else {
+      setSaveModal({
+        isOpen: true,
+        title: 'Saved Locally (Sync Warning)',
+        message: `Saved to browser storage. Central DB sync notice: ${res.error || 'Connection failed'}.`,
+        type: 'warning',
+      });
+    }
+    setTimeout(() => setSaveModal((prev) => ({ ...prev, isOpen: false })), 3500);
   };
 
   const handleResetDefaults = () => {
@@ -177,11 +209,11 @@ export const ContactContentEditor: React.FC = () => {
       message: 'Are you sure you want to reset all phone numbers, email addresses, office locations, and SMTP configurations back to defaults?',
       confirmText: 'Reset to Defaults',
       type: 'warning',
-      onConfirm: () => {
+      onConfirm: async () => {
         setConfig(DEFAULT_CONTACT_CONFIG);
         localStorage.setItem('sain_contact_content_config', JSON.stringify(DEFAULT_CONTACT_CONFIG));
-        saveSiteConfigToDb('sain_contact_content_config', DEFAULT_CONTACT_CONFIG);
         window.dispatchEvent(new Event('sain_contact_content_updated'));
+        await saveSiteConfigToDb(CONFIG_KEYS.CONTACT_CONTENT, DEFAULT_CONTACT_CONFIG);
         setConfirmModal(null);
       },
     });
@@ -197,7 +229,7 @@ export const ContactContentEditor: React.FC = () => {
     setTestResult(null);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/contact/test-smtp/`, {
+      const res = await fetch(`${getApiBaseUrl()}/api/v1/contact/test-smtp/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -248,7 +280,7 @@ export const ContactContentEditor: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {saved && (
+          {saveModal.isOpen && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold animate-in fade-in">
               <CheckCircle className="w-4 h-4" />
               <span>Saved & Live on Website</span>
@@ -899,9 +931,10 @@ export const ContactContentEditor: React.FC = () => {
       )}
       {/* Centered Save Success Modal Popup */}
       <SaveSuccessModal
-        isOpen={saved}
-        title="Contact Changes Saved!"
-        message="Contact information and office locations are now live across the website."
+        isOpen={saveModal.isOpen}
+        title={saveModal.title}
+        message={saveModal.message}
+        type={saveModal.type}
       />
     </div>
   );
