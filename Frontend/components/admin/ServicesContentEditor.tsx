@@ -1,8 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Save, CheckCircle, Truck, Plus, Trash2, Edit3, Upload, Image, X, ListPlus, ExternalLink, Loader2 } from 'lucide-react';
+import {
+  Save,
+  CheckCircle,
+  Truck,
+  Plus,
+  Trash2,
+  Edit3,
+  Upload,
+  Image,
+  X,
+  ListPlus,
+  ExternalLink,
+  Loader2,
+  ArrowUp,
+  ArrowDown,
+  GripVertical,
+} from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { SaveSuccessModal } from './SaveSuccessModal';
-import { saveSiteConfigToDb } from '../../services/siteConfigService';
+import { saveSiteConfigToDb, fetchSiteConfigFromDb, CONFIG_KEYS } from '../../services/siteConfigService';
 import { uploadMediaToCloudinary } from '../../services/uploadService';
 import { RichParagraphEditor } from './RichParagraphEditor';
 
@@ -125,7 +141,17 @@ export const ServicesContentEditor: React.FC = () => {
   const [isNewCard, setIsNewCard] = useState(false);
   const [isUploadingCardImage, setIsUploadingCardImage] = useState(false);
   const [newFeatureInput, setNewFeatureInput] = useState('');
-  const [saved, setSaved] = useState(false);
+  const [saveModal, setSaveModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'warning' | 'error';
+  }>({
+    isOpen: false,
+    title: 'Services Changes Saved!',
+    message: 'Freight service offerings and catalog cards are now live across the website.',
+    type: 'success',
+  });
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -135,8 +161,29 @@ export const ServicesContentEditor: React.FC = () => {
     onConfirm: () => void;
   } | null>(null);
 
-  // Sync state when restored from History or updated externally
+  // Drag-and-drop & sequence ordering states
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  // Sync state when restored from History or updated externally, and fetch from Central DB on mount
   useEffect(() => {
+    fetchSiteConfigFromDb<ServicesSectionHeaderConfig>(CONFIG_KEYS.SERVICES_HEADER, DEFAULT_SERVICES_HEADER).then((remote) => {
+      if (remote) setHeaderConfig(remote);
+    });
+    fetchSiteConfigFromDb<ServiceCard[]>(CONFIG_KEYS.SERVICES_CONTENT, DEFAULT_SERVICE_CARDS).then((remote) => {
+      if (Array.isArray(remote) && remote.length > 0) {
+        setCards(
+          remote.map((item: any) => ({
+            id: item.id || `service-${Date.now()}`,
+            title: item.title || 'Untitled Service',
+            image: item.image || '/assets/images/air_freight.webp',
+            description: item.fullDescription || item.description || '',
+            features: Array.isArray(item.features) ? item.features : [],
+          }))
+        );
+      }
+    });
+
     const handleSync = () => {
       try {
         const storedHeader = localStorage.getItem('sain_services_section_config');
@@ -172,18 +219,107 @@ export const ServicesContentEditor: React.FC = () => {
     };
   }, []);
 
-  // Save changes to localStorage & dispatch live update
-  const persistChanges = (updatedCards: ServiceCard[], updatedHeader: ServicesSectionHeaderConfig) => {
-    saveSiteConfigToDb('sain_services_content_config', updatedCards);
-    saveSiteConfigToDb('sain_services_section_config', updatedHeader);
+  // Save changes to localStorage & dispatch live update, and sync to Central Neon DB
+  const persistChanges = async (updatedCards: ServiceCard[], updatedHeader: ServicesSectionHeaderConfig) => {
+    localStorage.setItem('sain_services_content_config', JSON.stringify(updatedCards));
+    localStorage.setItem('sain_services_section_config', JSON.stringify(updatedHeader));
     window.dispatchEvent(new Event('sain_services_content_updated'));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+
+    const [res1, res2] = await Promise.all([
+      saveSiteConfigToDb(CONFIG_KEYS.SERVICES_CONTENT, updatedCards),
+      saveSiteConfigToDb(CONFIG_KEYS.SERVICES_HEADER, updatedHeader),
+    ]);
+
+    const isAllOk = res1.success && res2.success;
+    if (isAllOk) {
+      setSaveModal({
+        isOpen: true,
+        title: 'Services Changes Saved!',
+        message: 'Freight service offerings and catalog cards are saved to Central Neon Database and live across all devices.',
+        type: 'success',
+      });
+    } else {
+      setSaveModal({
+        isOpen: true,
+        title: 'Saved Locally (Sync Warning)',
+        message: `Saved to browser storage. Central DB sync notice: ${res1.error || res2.error || 'Connection failed'}.`,
+        type: 'warning',
+      });
+    }
+    setTimeout(() => setSaveModal((prev) => ({ ...prev, isOpen: false })), 3500);
   };
 
   const handleSaveHeader = (e: React.FormEvent) => {
     e.preventDefault();
     persistChanges(cards, headerConfig);
+  };
+
+  // Reorder: Move Card Up (Higher Priority / earlier in display sequence)
+  const handleMoveUp = (idx: number) => {
+    if (idx <= 0) return;
+    const next = [...cards];
+    const temp = next[idx - 1];
+    next[idx - 1] = next[idx];
+    next[idx] = temp;
+    setCards(next);
+    persistChanges(next, headerConfig);
+  };
+
+  // Reorder: Move Card Down (Lower Priority / later in display sequence)
+  const handleMoveDown = (idx: number) => {
+    if (idx >= cards.length - 1) return;
+    const next = [...cards];
+    const temp = next[idx + 1];
+    next[idx + 1] = next[idx];
+    next[idx] = temp;
+    setCards(next);
+    persistChanges(next, headerConfig);
+  };
+
+  // Direct Position Assignment (e.g. pick #1, #2, etc.)
+  const handleChangePosition = (fromIdx: number, toIdx: number) => {
+    if (toIdx === fromIdx || toIdx < 0 || toIdx >= cards.length) return;
+    const next = [...cards];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    setCards(next);
+    persistChanges(next, headerConfig);
+  };
+
+  // Drag and Drop Handlers
+  const handleDragStart = (e: React.DragEvent, idx: number) => {
+    setDraggedIndex(idx);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(idx));
+  };
+
+  const handleDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverIndex !== idx) {
+      setDragOverIndex(idx);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIdx: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIdx) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+    const next = [...cards];
+    const [moved] = next.splice(draggedIndex, 1);
+    next.splice(targetIdx, 0, moved);
+    setCards(next);
+    persistChanges(next, headerConfig);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
   };
 
   const handleAddNewCard = () => {
@@ -336,7 +472,7 @@ export const ServicesContentEditor: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {saved && (
+          {saveModal.isOpen && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold animate-in fade-in">
               <CheckCircle className="w-4 h-4" />
               <span>Catalog Updated Live</span>
@@ -444,9 +580,74 @@ export const ServicesContentEditor: React.FC = () => {
           {cards.map((card, idx) => (
             <div
               key={card.id}
-              className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition flex flex-col justify-between"
+              onDragOver={(e) => handleDragOver(e, idx)}
+              onDrop={(e) => handleDrop(e, idx)}
+              className={`bg-white border rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between ${
+                dragOverIndex === idx
+                  ? 'border-[#1a6c7a] ring-2 ring-[#1a6c7a]/40 scale-[1.01] shadow-lg'
+                  : draggedIndex === idx
+                  ? 'opacity-40 border-dashed border-slate-400 bg-slate-50'
+                  : 'border-slate-200'
+              }`}
             >
               <div>
+                {/* Serial Order & Reorder Bar */}
+                <div className="px-3.5 py-2 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    {/* Drag Handle */}
+                    <div
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, idx)}
+                      onDragEnd={handleDragEnd}
+                      className="p-1 rounded text-slate-400 hover:text-slate-800 hover:bg-slate-200 cursor-grab active:cursor-grabbing transition"
+                      title="Drag to rearrange card order"
+                    >
+                      <GripVertical className="w-4 h-4" />
+                    </div>
+
+                    {/* Serial Position Selector */}
+                    <div className="flex items-center gap-1">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        Order:
+                      </span>
+                      <select
+                        value={idx}
+                        onChange={(e) => handleChangePosition(idx, Number(e.target.value))}
+                        className="bg-white border border-slate-300 rounded-md px-1.5 py-0.5 text-xs font-bold text-[#1a6c7a] outline-none cursor-pointer focus:border-[#1a6c7a]"
+                        title="Select exact serial display position"
+                      >
+                        {cards.map((_, i) => (
+                          <option key={i} value={i}>
+                            #{i + 1} {i === 0 ? '(1st)' : i === cards.length - 1 ? '(Last)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Move Up / Down Sequential Buttons */}
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      type="button"
+                      disabled={idx === 0}
+                      onClick={() => handleMoveUp(idx)}
+                      className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded disabled:opacity-20 disabled:cursor-not-allowed transition cursor-pointer"
+                      title="Move card backward (Higher priority / Earlier)"
+                    >
+                      <ArrowUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={idx === cards.length - 1}
+                      onClick={() => handleMoveDown(idx)}
+                      className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded disabled:opacity-20 disabled:cursor-not-allowed transition cursor-pointer"
+                      title="Move card forward (Lower priority / Later)"
+                    >
+                      <ArrowDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
                 {/* Thumbnail Preview */}
                 <div className="relative h-40 bg-slate-900 overflow-hidden">
                   {card.image ? (
@@ -726,9 +927,10 @@ export const ServicesContentEditor: React.FC = () => {
       )}
       {/* Centered Save Success Modal Popup */}
       <SaveSuccessModal
-        isOpen={saved}
-        title="Services Changes Saved!"
-        message="Freight service offerings and catalog cards are now live across the website."
+        isOpen={saveModal.isOpen}
+        title={saveModal.title}
+        message={saveModal.message}
+        type={saveModal.type}
       />
     </div>
   );
