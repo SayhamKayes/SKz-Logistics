@@ -6,9 +6,15 @@ import {
   buildConsignmentTimeline,
   normalizeStatus,
 } from '../services/trackingData';
-import { API_BASE_URL } from '../services/databaseConfig';
+import { getApiBaseUrl, API_BASE_URL } from '../services/databaseConfig';
 
 export type AppTab = 'home' | 'about' | 'services' | 'contact' | 'track' | 'admin';
+
+export interface ConsignmentSyncResult {
+  success: boolean;
+  error?: string;
+  consignmentNo?: string;
+}
 
 interface TrackingContextType {
   activeConsignment: Consignment | null;
@@ -29,9 +35,9 @@ interface TrackingContextType {
   closeQuoteModal: () => void;
   setDevDbModalOpen: (isOpen: boolean) => void;
   searchConsignment: (code: string) => Promise<Consignment>;
-  updateConsignment: (consignment: Consignment) => Promise<void>;
-  addConsignment: (consignment: Consignment) => Promise<void>;
-  deleteConsignment: (consignmentNo: string) => Promise<void>;
+  updateConsignment: (consignment: Consignment) => Promise<ConsignmentSyncResult>;
+  addConsignment: (consignment: Consignment) => Promise<ConsignmentSyncResult>;
+  deleteConsignment: (consignmentNo: string) => Promise<ConsignmentSyncResult>;
 }
 
 const TrackingContext = createContext<TrackingContextType | undefined>(undefined);
@@ -147,10 +153,17 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Initial backend fetch to ensure admin panel and client have live DB data
   useEffect(() => {
     const fetchBackendConsignments = async () => {
+      const baseUrl = getApiBaseUrl();
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/couriers/consignments/`, {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+        const res = await fetch(`${baseUrl}/api/v1/couriers/consignments/`, {
           headers: { Accept: 'application/json' },
+          signal: controller.signal,
         });
+        clearTimeout(timeoutId);
+
         if (res.ok) {
           const list = await res.json();
           if (Array.isArray(list) && list.length > 0) {
@@ -345,7 +358,8 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     // 1. Try Live Django REST Framework API First
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/couriers/track/${encodeURIComponent(clean)}/`, {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}/api/v1/couriers/track/${encodeURIComponent(clean)}/`, {
         headers: { 'Accept': 'application/json' },
       });
 
@@ -457,7 +471,8 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   // Sync updates with Django REST Framework backend
-  const syncWithBackend = async (consignment: Consignment) => {
+  const syncWithBackend = async (consignment: Consignment): Promise<ConsignmentSyncResult> => {
+    const baseUrl = getApiBaseUrl();
     try {
       const payload = {
         consignment_no: consignment.consignmentNo,
@@ -509,22 +524,35 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         })) || [],
       };
 
-      const res = await fetch(`${API_BASE_URL}/api/v1/couriers/consignments/`, {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+      const res = await fetch(`${baseUrl}/api/v1/couriers/consignments/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => null);
+        const errMsg = `Database responded with status ${res.status}: ${JSON.stringify(errJson || '')}`;
         console.warn('Django sync returned status', res.status, errJson);
+        return { success: false, error: errMsg, consignmentNo: consignment.consignmentNo };
       }
-    } catch (e) {
-      console.info('Backend sync pending or local offline mode:', e);
+
+      return { success: true, consignmentNo: consignment.consignmentNo };
+    } catch (e: any) {
+      const errMsg = e.name === 'AbortError'
+        ? 'Connection timed out while syncing with Central Database.'
+        : (e.message || 'Network error connecting to backend database.');
+      console.warn('Backend sync failed:', errMsg);
+      return { success: false, error: errMsg, consignmentNo: consignment.consignmentNo };
     }
   };
 
-  const updateConsignment = async (consignment: Consignment) => {
+  const updateConsignment = async (consignment: Consignment): Promise<ConsignmentSyncResult> => {
     setAllConsignments((prev) => {
       const next = { ...prev, [consignment.consignmentNo]: consignment };
       localStorage.setItem(LOCAL_STORAGE_CONSIGNMENTS_KEY, JSON.stringify(next));
@@ -540,10 +568,10 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       window.dispatchEvent(new CustomEvent('sain_consignment_updated', { detail: consignment }));
     }
 
-    await syncWithBackend(consignment);
+    return await syncWithBackend(consignment);
   };
 
-  const addConsignment = async (consignment: Consignment) => {
+  const addConsignment = async (consignment: Consignment): Promise<ConsignmentSyncResult> => {
     setAllConsignments((prev) => {
       const next = { ...prev, [consignment.consignmentNo]: consignment };
       localStorage.setItem(LOCAL_STORAGE_CONSIGNMENTS_KEY, JSON.stringify(next));
@@ -555,10 +583,10 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       window.dispatchEvent(new CustomEvent('sain_consignment_updated', { detail: consignment }));
     }
 
-    await syncWithBackend(consignment);
+    return await syncWithBackend(consignment);
   };
 
-  const deleteConsignment = async (consignmentNo: string) => {
+  const deleteConsignment = async (consignmentNo: string): Promise<ConsignmentSyncResult> => {
     setAllConsignments((prev) => {
       const next = { ...prev };
       delete next[consignmentNo];
@@ -572,12 +600,24 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setActiveConsignment(null);
     }
 
+    const baseUrl = getApiBaseUrl();
     try {
-      await fetch(`${API_BASE_URL}/api/v1/couriers/track/${encodeURIComponent(consignmentNo)}/`, {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+      const res = await fetch(`${baseUrl}/api/v1/couriers/track/${encodeURIComponent(consignmentNo)}/`, {
         method: 'DELETE',
+        signal: controller.signal,
       });
-    } catch (e) {
-      console.info('Backend delete skipped:', e);
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        return { success: false, error: `Delete responded with status ${res.status}`, consignmentNo };
+      }
+      return { success: true, consignmentNo };
+    } catch (e: any) {
+      console.warn('Backend delete error:', e);
+      return { success: false, error: e.message || 'Delete request failed', consignmentNo };
     }
   };
 
