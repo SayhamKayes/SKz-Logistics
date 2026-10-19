@@ -1,5 +1,5 @@
 import { getBangladeshDateTime } from './trackingData';
-import { API_BASE_URL } from './databaseConfig';
+import { getApiBaseUrl } from './databaseConfig';
 
 export type HistoryModule = 
   | 'shipments' 
@@ -144,7 +144,7 @@ export function recordAdminHistory(params: {
 
 async function persistHistoryToBackend(data: HistoryRecord[]) {
   try {
-    await fetch(`${API_BASE_URL}/api/v1/config/${encodeURIComponent(ADMIN_HISTORY_STORAGE_KEY)}/`, {
+    await fetch(`${getApiBaseUrl()}/api/v1/config/${encodeURIComponent(ADMIN_HISTORY_STORAGE_KEY)}/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -233,7 +233,7 @@ export function exportHistoryAsJson(): void {
  */
 export async function restoreFromSnapshot(
   record: HistoryRecord,
-  updateConsignmentFn?: (c: any) => Promise<void>
+  updateConsignmentFn?: (c: any) => Promise<any>
 ): Promise<{ success: boolean; message: string }> {
   if (!record.snapshot) {
     return { success: false, message: 'This history entry has no snapshot data to restore.' };
@@ -261,7 +261,7 @@ export async function restoreFromSnapshot(
         }
 
         try {
-          await fetch(`${API_BASE_URL}/api/v1/couriers/track/${encodeURIComponent(consignment.consignmentNo)}/`, {
+          await fetch(`${getApiBaseUrl()}/api/v1/couriers/track/${encodeURIComponent(consignment.consignmentNo)}/`, {
             method: 'DELETE',
           });
         } catch {}
@@ -297,7 +297,7 @@ export async function restoreFromSnapshot(
         }
 
         try {
-          await fetch(`${API_BASE_URL}/api/v1/couriers/track/${encodeURIComponent(consignment.consignmentNo)}/`, {
+          await fetch(`${getApiBaseUrl()}/api/v1/couriers/track/${encodeURIComponent(consignment.consignmentNo)}/`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify(consignment),
@@ -389,7 +389,7 @@ export async function restoreFromSnapshot(
 
       // Persist to backend DB
       try {
-        await fetch(`${API_BASE_URL}/api/v1/config/${encodeURIComponent(targetKey)}/`, {
+        await fetch(`${getApiBaseUrl()}/api/v1/config/${encodeURIComponent(targetKey)}/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
           body: JSON.stringify(snapshot),
