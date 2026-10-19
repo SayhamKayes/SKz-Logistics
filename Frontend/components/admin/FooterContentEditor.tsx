@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { SaveSuccessModal } from './SaveSuccessModal';
-import { saveSiteConfigToDb } from '../../services/siteConfigService';
+import { saveSiteConfigToDb, fetchSiteConfigFromDb, CONFIG_KEYS } from '../../services/siteConfigService';
 import { uploadMediaToCloudinary } from '../../services/uploadService';
 import { RichParagraphEditor } from './RichParagraphEditor';
 import { sanitizeRichHtml } from '../../utils/sanitizeHtml';
@@ -100,7 +100,17 @@ export const FooterContentEditor: React.FC = () => {
   });
 
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saveModal, setSaveModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'warning' | 'error';
+  }>({
+    isOpen: false,
+    title: 'Footer Changes Saved!',
+    message: 'Footer navigation, links, and contact information are now live across the website.',
+    type: 'success',
+  });
   const [newServiceInput, setNewServiceInput] = useState('');
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -111,8 +121,12 @@ export const FooterContentEditor: React.FC = () => {
     onConfirm: () => void;
   } | null>(null);
 
-  // Sync state whenever configuration is restored from History or updated externally
+  // Sync state whenever configuration is restored from History or updated externally, and fetch on mount
   useEffect(() => {
+    fetchSiteConfigFromDb<FooterConfig>(CONFIG_KEYS.FOOTER_CONTENT, DEFAULT_FOOTER_CONFIG).then((remote) => {
+      if (remote) setConfig((prev) => ({ ...prev, ...remote }));
+    });
+
     const handleSync = () => {
       try {
         const stored = localStorage.getItem(FOOTER_STORAGE_KEY);
@@ -199,12 +213,28 @@ export const FooterContentEditor: React.FC = () => {
     });
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveSiteConfigToDb(FOOTER_STORAGE_KEY, config);
+    localStorage.setItem(FOOTER_STORAGE_KEY, JSON.stringify(config));
     window.dispatchEvent(new Event(FOOTER_UPDATE_EVENT));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+
+    const res = await saveSiteConfigToDb(FOOTER_STORAGE_KEY, config);
+    if (res.success) {
+      setSaveModal({
+        isOpen: true,
+        title: 'Footer Changes Saved!',
+        message: 'Footer navigation, links, and contact information are saved to Central Neon Database and live across all devices.',
+        type: 'success',
+      });
+    } else {
+      setSaveModal({
+        isOpen: true,
+        title: 'Saved Locally (Sync Warning)',
+        message: `Saved to browser storage. Central DB sync notice: ${res.error || 'Connection failed'}.`,
+        type: 'warning',
+      });
+    }
+    setTimeout(() => setSaveModal((prev) => ({ ...prev, isOpen: false })), 3500);
   };
 
   const handleResetDefaults = () => {
@@ -214,11 +244,11 @@ export const FooterContentEditor: React.FC = () => {
       message: 'Are you sure you want to reset all footer brand narrative, copyright text, contact details, services list, and legal links to default values?',
       confirmText: 'Reset to Defaults',
       type: 'warning',
-      onConfirm: () => {
+      onConfirm: async () => {
         setConfig(DEFAULT_FOOTER_CONFIG);
         localStorage.setItem(FOOTER_STORAGE_KEY, JSON.stringify(DEFAULT_FOOTER_CONFIG));
-        saveSiteConfigToDb(FOOTER_STORAGE_KEY, DEFAULT_FOOTER_CONFIG);
         window.dispatchEvent(new Event(FOOTER_UPDATE_EVENT));
+        await saveSiteConfigToDb(FOOTER_STORAGE_KEY, DEFAULT_FOOTER_CONFIG);
         setConfirmModal(null);
       },
     });
@@ -263,7 +293,7 @@ export const FooterContentEditor: React.FC = () => {
             onClick={handleSave}
             className="px-4 py-2 bg-[#1a6c7a] hover:bg-[#153243] text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg flex items-center gap-2 transition cursor-pointer"
           >
-            {saved ? (
+            {saveModal.isOpen ? (
               <>
                 <CheckCircle className="w-4 h-4 text-emerald-300" />
                 <span>Saved Live!</span>
@@ -648,7 +678,7 @@ export const FooterContentEditor: React.FC = () => {
             type="submit"
             className="px-6 py-2.5 bg-[#1a6c7a] hover:bg-[#153243] text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg flex items-center gap-2 transition cursor-pointer"
           >
-            {saved ? (
+            {saveModal.isOpen ? (
               <>
                 <CheckCircle className="w-4 h-4 text-emerald-300" />
                 <span>Saved Live!</span>
@@ -677,9 +707,10 @@ export const FooterContentEditor: React.FC = () => {
       )}
       {/* Centered Save Success Modal Popup */}
       <SaveSuccessModal
-        isOpen={saved}
-        title="Footer Changes Saved!"
-        message="Footer navigation, links, and contact information are now live across the website."
+        isOpen={saveModal.isOpen}
+        title={saveModal.title}
+        message={saveModal.message}
+        type={saveModal.type}
       />
     </div>
   );
