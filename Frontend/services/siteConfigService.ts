@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './databaseConfig';
+import { getApiBaseUrl } from './databaseConfig';
 import { recordAdminHistory, ADMIN_HISTORY_STORAGE_KEY } from './adminHistoryService';
 
 export const CONFIG_KEYS = {
@@ -13,6 +13,13 @@ export const CONFIG_KEYS = {
   CONTACT_CONTENT: 'sain_contact_content_config',
   FOOTER_CONTENT: 'sain_footer_content_config',
   ADMIN_PROFILE: 'sain_admin_profile',
+  CUSTOM_ORIGINS: 'sain_custom_origins',
+  CUSTOM_DESTINATIONS: 'sain_custom_destinations',
+  CUSTOM_AGENTS: 'sain_custom_agents',
+  CUSTOM_CLIENTS: 'sain_custom_clients',
+  CUSTOM_EMPLOYEES: 'sain_custom_employees',
+  TRASHED_CONSIGNMENTS: 'sain_trashed_consignments',
+  LOGISTICS_RATES: 'sain_logistics_rates_config',
 } as const;
 
 function recordConfigChangeHistory(key: string, data: any, previousData: any) {
@@ -100,6 +107,24 @@ function recordConfigChangeHistory(key: string, data: any, previousData: any) {
       entityId = 'Admin Credentials';
       description = `Updated administrator profile settings for ${data?.username || 'admin'}`;
       break;
+    case CONFIG_KEYS.CUSTOM_ORIGINS:
+    case CONFIG_KEYS.CUSTOM_DESTINATIONS:
+    case CONFIG_KEYS.CUSTOM_AGENTS:
+    case CONFIG_KEYS.CUSTOM_CLIENTS:
+    case CONFIG_KEYS.CUSTOM_EMPLOYEES:
+      module = 'shipments';
+      moduleLabel = 'Shipment Manager';
+      actionLabel = 'Updated Dropdown List';
+      entityId = key;
+      description = `Updated ${key.replace('sain_custom_', '')} catalog list in Central Database`;
+      break;
+    case CONFIG_KEYS.TRASHED_CONSIGNMENTS:
+      module = 'shipments';
+      moduleLabel = 'Shipment Manager';
+      actionLabel = 'Updated Recycle Bin';
+      entityId = 'Recycle Bin';
+      description = 'Updated trashed shipments in Central Database';
+      break;
     default:
       return; // Do not record unknown / internal keys
   }
@@ -121,11 +146,21 @@ function recordConfigChangeHistory(key: string, data: any, previousData: any) {
   });
 }
 
+export interface SaveDbResult {
+  success: boolean;
+  error?: string;
+  key: string;
+}
+
 /**
  * Persists a configuration payload both to localStorage (instant local cache)
  * and asynchronously to the Neon PostgreSQL database via Django DRF.
  */
-export async function saveSiteConfigToDb(key: string, data: any, explicitPrevious?: any): Promise<boolean> {
+export async function saveSiteConfigToDb(
+  key: string,
+  data: any,
+  explicitPrevious?: any
+): Promise<SaveDbResult> {
   // 1. Capture previous data BEFORE overwriting localStorage
   let previousData = explicitPrevious;
   if (previousData === undefined) {
@@ -174,28 +209,56 @@ export async function saveSiteConfigToDb(key: string, data: any, explicitPreviou
     if (key === CONFIG_KEYS.ABOUT_CONTENT) window.dispatchEvent(new Event('sain_about_content_updated'));
     if (key === CONFIG_KEYS.CONTACT_CONTENT) window.dispatchEvent(new Event('sain_contact_content_updated'));
     if (key === CONFIG_KEYS.SHIPMENT_TIMERS || key === CONFIG_KEYS.SHIPMENT_TIMERS_HEADER) window.dispatchEvent(new Event('sain_shipment_timers_updated'));
+    if (key === CONFIG_KEYS.CUSTOM_ORIGINS || key === CONFIG_KEYS.CUSTOM_DESTINATIONS || key === CONFIG_KEYS.CUSTOM_AGENTS || key === CONFIG_KEYS.CUSTOM_CLIENTS || key === CONFIG_KEYS.CUSTOM_EMPLOYEES) {
+      window.dispatchEvent(new Event('sain_custom_dropdowns_updated'));
+    }
   }
 
-  // 5. Persist to Neon PostgreSQL database
+  // 5. Persist to Neon PostgreSQL database via live backend
+  const baseUrl = getApiBaseUrl();
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/config/${encodeURIComponent(key)}/`, {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout for server cold starts
+
+    const res = await fetch(`${baseUrl}/api/v1/config/${encodeURIComponent(key)}/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
       body: JSON.stringify(data),
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
     if (res.ok) {
-      return true;
+      const result: SaveDbResult = { success: true, key };
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sain_db_save_status', { detail: result }));
+      }
+      return result;
     } else {
+      const errText = await res.text().catch(() => '');
+      const errMsg = `Database responded with status ${res.status}: ${errText.slice(0, 100)}`;
       console.warn(`[siteConfig] DB save returned status ${res.status} for ${key}`);
-      return false;
+      const result: SaveDbResult = { success: false, error: errMsg, key };
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sain_db_save_status', { detail: result }));
+      }
+      return result;
     }
-  } catch (err) {
-    console.info(`[siteConfig] DB save offline or pending for ${key}:`, err);
-    return false;
+  } catch (err: any) {
+    const isTimeout = err.name === 'AbortError';
+    const errMsg = isTimeout
+      ? 'Connection timed out. Central database may be waking up, please try again.'
+      : (err.message || 'Network connection failed. Backend server unreachable.');
+
+    console.warn(`[siteConfig] DB save error for ${key}:`, errMsg);
+    const result: SaveDbResult = { success: false, error: errMsg, key };
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sain_db_save_status', { detail: result }));
+    }
+    return result;
   }
 }
 
@@ -214,10 +277,16 @@ export async function fetchSiteConfigFromDb<T>(key: string, defaultData: T): Pro
   } catch {}
 
   // Fetch from Neon PostgreSQL database
+  const baseUrl = getApiBaseUrl();
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/config/${encodeURIComponent(key)}/`, {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const res = await fetch(`${baseUrl}/api/v1/config/${encodeURIComponent(key)}/`, {
       headers: { Accept: 'application/json' },
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
     if (res.ok) {
       const json = await res.json();
@@ -241,10 +310,16 @@ export async function fetchSiteConfigFromDb<T>(key: string, defaultData: T): Pro
  * Updates local caches and dispatches live update events across components.
  */
 export async function syncAllSiteConfigsFromDb(): Promise<void> {
+  const baseUrl = getApiBaseUrl();
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/config/`, {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+    const res = await fetch(`${baseUrl}/api/v1/config/`, {
       headers: { Accept: 'application/json' },
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
     if (!res.ok) return;
 
@@ -270,8 +345,10 @@ export async function syncAllSiteConfigsFromDb(): Promise<void> {
       window.dispatchEvent(new Event('sain_about_content_updated'));
       window.dispatchEvent(new Event('sain_contact_content_updated'));
       window.dispatchEvent(new Event('sain_footer_content_updated'));
+      window.dispatchEvent(new Event('sain_custom_dropdowns_updated'));
     }
   } catch (err) {
     console.info('[siteConfig] Initial DB sync skipped (offline mode)');
   }
 }
+
