@@ -50,13 +50,90 @@ export const DEFAULT_DB_CONFIG: DatabaseConnectionConfig = {
   },
 };
 
-export const API_BASE_URL =
-  (import.meta as any).env?.VITE_API_BASE_URL ||
-  (typeof window !== 'undefined' && window.location.hostname === 'localhost'
-    ? 'http://127.0.0.1:8000'
-    : 'https://skzlogisticsbackend.onrender.com');
+export const LIVE_BACKEND_URL = 'https://skzlogisticsbackend.onrender.com';
+export const LOCAL_BACKEND_URL = 'http://127.0.0.1:8000';
+export const BACKEND_ENV_KEY = 'sain_backend_env_mode'; // 'live' | 'local'
+
+export function getBackendEnv(): 'live' | 'local' {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem(BACKEND_ENV_KEY);
+    if (stored === 'local') return 'local';
+    if (stored === 'live') return 'live';
+  }
+  return 'live'; // Default to live production Neon DB backend so both localhost and live site use central DB
+}
+
+export function setBackendEnv(env: 'live' | 'local'): void {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(BACKEND_ENV_KEY, env);
+    window.dispatchEvent(new CustomEvent('sain_backend_env_changed', { detail: env }));
+  }
+}
+
+export function getApiBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    const override = localStorage.getItem('sain_api_base_url_override');
+    if (override && override.trim()) return override.trim().replace(/\/+$/, '');
+
+    const envMode = getBackendEnv();
+    if (envMode === 'local') return LOCAL_BACKEND_URL;
+    return LIVE_BACKEND_URL;
+  }
+
+  const envVar = (import.meta as any).env?.VITE_API_BASE_URL;
+  if (envVar && envVar.trim()) {
+    return envVar.trim().replace(/\/+$/, '');
+  }
+
+  return LIVE_BACKEND_URL;
+}
+
+export const API_BASE_URL = getApiBaseUrl();
 
 export const DB_STORAGE_KEY = 'sain_db_provider_config';
+
+export async function checkBackendHealth(targetUrl: string = getApiBaseUrl()): Promise<{
+  isOnline: boolean;
+  latencyMs: number;
+  statusText?: string;
+  error?: string;
+}> {
+  const start = performance.now();
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout for Render wake-up
+
+    const res = await fetch(`${targetUrl}/api/v1/health/`, {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    const latency = Math.round(performance.now() - start);
+    if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return {
+        isOnline: true,
+        latencyMs: latency,
+        statusText: data.status || 'online',
+      };
+    } else {
+      return {
+        isOnline: false,
+        latencyMs: latency,
+        error: `Server responded with status ${res.status}`,
+      };
+    }
+  } catch (err: any) {
+    const latency = Math.round(performance.now() - start);
+    const msg = err.name === 'AbortError' ? 'Connection timed out (Server sleeping or unreachable)' : (err.message || 'Network error');
+    return {
+      isOnline: false,
+      latencyMs: latency,
+      error: msg,
+    };
+  }
+}
 
 export function getDatabaseConfig(): DatabaseConnectionConfig {
   try {
@@ -77,3 +154,4 @@ export function saveDatabaseConfig(config: DatabaseConnectionConfig) {
     console.error('Failed to save DB config', e);
   }
 }
+
