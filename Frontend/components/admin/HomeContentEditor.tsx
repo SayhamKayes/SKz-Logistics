@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Save, CheckCircle, Sparkles, Image, Upload, RotateCcw, Search, Package, ExternalLink, Phone, Loader2 } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { SaveSuccessModal } from './SaveSuccessModal';
-import { saveSiteConfigToDb } from '../../services/siteConfigService';
+import { saveSiteConfigToDb, fetchSiteConfigFromDb, CONFIG_KEYS } from '../../services/siteConfigService';
 import { uploadMediaToCloudinary } from '../../services/uploadService';
 import { RichParagraphEditor } from './RichParagraphEditor';
 
@@ -64,7 +64,17 @@ export const HomeContentEditor: React.FC = () => {
   });
 
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saveModal, setSaveModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'warning' | 'error';
+  }>({
+    isOpen: false,
+    title: 'Hero Changes Saved!',
+    message: 'Hero section and messenger configuration are now live across the website.',
+    type: 'success',
+  });
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -74,8 +84,15 @@ export const HomeContentEditor: React.FC = () => {
     onConfirm: () => void;
   } | null>(null);
 
-  // Sync state when restored from History or updated externally
+  // Sync state when restored from History or updated externally, and fetch from Central DB on mount
   useEffect(() => {
+    // Fetch directly from Central Neon DB
+    fetchSiteConfigFromDb<HeroConfig>(CONFIG_KEYS.HERO_CONTENT, DEFAULT_HERO_CONFIG).then((remote) => {
+      if (remote) {
+        setConfig((prev) => ({ ...prev, ...remote }));
+      }
+    });
+
     const handleSync = () => {
       try {
         const stored = localStorage.getItem('sain_hero_content_config');
@@ -146,12 +163,10 @@ export const HomeContentEditor: React.FC = () => {
     setConfig((prev) => ({ ...prev, logoUrl: DEFAULT_HERO_CONFIG.logoUrl }));
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveSiteConfigToDb('sain_hero_content_config', config);
-    saveSiteConfigToDb('sain_whatsapp_number', config.whatsappNumber);
-    saveSiteConfigToDb('sain_messenger_url', config.messengerUrl);
     localStorage.setItem('sain_messenger_url', config.messengerUrl);
+    localStorage.setItem('sain_hero_content_config', JSON.stringify(config));
     // Also sync to legacy home key for compatibility
     localStorage.setItem('sain_home_content_config', JSON.stringify({
       headline: config.headline,
@@ -161,8 +176,30 @@ export const HomeContentEditor: React.FC = () => {
     window.dispatchEvent(new Event('sain_hero_content_updated'));
     window.dispatchEvent(new Event('sain_whatsapp_updated'));
     window.dispatchEvent(new Event('sain_messenger_updated'));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+
+    const [res1, res2, res3] = await Promise.all([
+      saveSiteConfigToDb(CONFIG_KEYS.HERO_CONTENT, config),
+      saveSiteConfigToDb(CONFIG_KEYS.WHATSAPP_NUMBER, config.whatsappNumber),
+      saveSiteConfigToDb(CONFIG_KEYS.MESSENGER_URL, config.messengerUrl),
+    ]);
+
+    const isAllOk = res1.success && res2.success && res3.success;
+    if (isAllOk) {
+      setSaveModal({
+        isOpen: true,
+        title: 'Hero Changes Saved!',
+        message: 'Hero section and messenger configuration are saved to Central Neon Database and live across all devices.',
+        type: 'success',
+      });
+    } else {
+      setSaveModal({
+        isOpen: true,
+        title: 'Saved Locally (Sync Warning)',
+        message: `Saved to browser storage. Central DB sync notice: ${res1.error || res2.error || 'Connection failed'}`,
+        type: 'warning',
+      });
+    }
+    setTimeout(() => setSaveModal((prev) => ({ ...prev, isOpen: false })), 3500);
   };
 
   const handleResetDefaults = () => {
@@ -172,17 +209,19 @@ export const HomeContentEditor: React.FC = () => {
       message: 'Are you sure you want to reset all Hero Section text, headlines, descriptions, WhatsApp, and Messenger configuration back to default values?',
       confirmText: 'Reset to Defaults',
       type: 'warning',
-      onConfirm: () => {
+      onConfirm: async () => {
         setConfig(DEFAULT_HERO_CONFIG);
         localStorage.setItem('sain_hero_content_config', JSON.stringify(DEFAULT_HERO_CONFIG));
         localStorage.setItem('sain_whatsapp_number', DEFAULT_HERO_CONFIG.whatsappNumber);
         localStorage.setItem('sain_messenger_url', DEFAULT_HERO_CONFIG.messengerUrl);
-        saveSiteConfigToDb('sain_hero_content_config', DEFAULT_HERO_CONFIG);
-        saveSiteConfigToDb('sain_whatsapp_number', DEFAULT_HERO_CONFIG.whatsappNumber);
-        saveSiteConfigToDb('sain_messenger_url', DEFAULT_HERO_CONFIG.messengerUrl);
         window.dispatchEvent(new Event('sain_hero_content_updated'));
         window.dispatchEvent(new Event('sain_whatsapp_updated'));
         window.dispatchEvent(new Event('sain_messenger_updated'));
+        await Promise.all([
+          saveSiteConfigToDb(CONFIG_KEYS.HERO_CONTENT, DEFAULT_HERO_CONFIG),
+          saveSiteConfigToDb(CONFIG_KEYS.WHATSAPP_NUMBER, DEFAULT_HERO_CONFIG.whatsappNumber),
+          saveSiteConfigToDb(CONFIG_KEYS.MESSENGER_URL, DEFAULT_HERO_CONFIG.messengerUrl),
+        ]);
         setConfirmModal(null);
       },
     });
@@ -203,7 +242,7 @@ export const HomeContentEditor: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {saved && (
+          {saveModal.isOpen && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold animate-in fade-in">
               <CheckCircle className="w-4 h-4" />
               <span>Saved & Live on Homepage</span>
@@ -642,9 +681,10 @@ export const HomeContentEditor: React.FC = () => {
       )}
       {/* Centered Save Success Modal Popup */}
       <SaveSuccessModal
-        isOpen={saved}
-        title="Hero Changes Saved!"
-        message="Hero section and messenger configuration are now live across the website."
+        isOpen={saveModal.isOpen}
+        title={saveModal.title}
+        message={saveModal.message}
+        type={saveModal.type}
       />
     </div>
   );
