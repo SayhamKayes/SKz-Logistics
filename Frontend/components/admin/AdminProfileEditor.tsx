@@ -14,8 +14,20 @@ import {
   Sparkles,
   Clock,
   ExternalLink,
+  Database,
+  Server,
+  RefreshCw,
+  Wifi,
 } from 'lucide-react';
-import { saveSiteConfigToDb } from '../../services/siteConfigService';
+import { saveSiteConfigToDb, fetchSiteConfigFromDb, CONFIG_KEYS } from '../../services/siteConfigService';
+import {
+  getBackendEnv,
+  setBackendEnv,
+  checkBackendHealth,
+  getApiBaseUrl,
+  LIVE_BACKEND_URL,
+  LOCAL_BACKEND_URL,
+} from '../../services/databaseConfig';
 import { getAdminInitials } from '../../utils/adminInitials';
 import { SaveSuccessModal } from './SaveSuccessModal';
 
@@ -41,8 +53,63 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>('Today at 22:15 BST');
 
-  // Load profile from localStorage on mount and sync on live changes/restore
+  // Database Connectivity & Server Health State
+  const [backendEnv, setBackendEnvState] = useState<'live' | 'local'>(getBackendEnv());
+  const [serverHealth, setServerHealth] = useState<{
+    isOnline: boolean;
+    latencyMs: number;
+    isChecking: boolean;
+    error?: string;
+  }>({
+    isOnline: true,
+    latencyMs: 0,
+    isChecking: true,
+  });
+
+  // Check Django DRF backend & Neon PostgreSQL health
+  const performHealthCheck = async () => {
+    setServerHealth((prev) => ({ ...prev, isChecking: true }));
+    const result = await checkBackendHealth();
+    setServerHealth({
+      isOnline: result.isOnline,
+      latencyMs: result.latencyMs,
+      isChecking: false,
+      error: result.error,
+    });
+  };
+
   useEffect(() => {
+    performHealthCheck();
+    const handleEnvChanged = (e: any) => {
+      const newEnv = e.detail || getBackendEnv();
+      setBackendEnvState(newEnv);
+      setTimeout(performHealthCheck, 150);
+    };
+    window.addEventListener('sain_backend_env_changed', handleEnvChanged as EventListener);
+    return () => {
+      window.removeEventListener('sain_backend_env_changed', handleEnvChanged as EventListener);
+    };
+  }, []);
+
+  const handleSwitchBackendEnv = (newEnv: 'live' | 'local') => {
+    setBackendEnv(newEnv);
+    setBackendEnvState(newEnv);
+    setTimeout(performHealthCheck, 150);
+  };
+
+  // Load profile from Central DB and localStorage on mount and sync on live changes/restore
+  useEffect(() => {
+    fetchSiteConfigFromDb<any>(CONFIG_KEYS.ADMIN_PROFILE, null).then((remote) => {
+      if (remote) {
+        if (remote.name) setName(remote.name);
+        if (remote.username) setUsername(remote.username);
+        if (remote.email) setEmail(remote.email);
+        if (remote.phone) setPhone(remote.phone);
+        if (remote.password) setStoredPassword(remote.password);
+        if (remote.lastUpdated) setLastUpdated(remote.lastUpdated);
+      }
+    });
+
     const handleSync = () => {
       try {
         const stored = localStorage.getItem('sain_admin_profile');
@@ -70,7 +137,7 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
     };
   }, []);
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
 
@@ -118,7 +185,7 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
       lastUpdated: timestamp,
     };
 
-    saveSiteConfigToDb('sain_admin_profile', updatedProfile);
+    localStorage.setItem('sain_admin_profile', JSON.stringify(updatedProfile));
     setStoredPassword(passwordToSave);
     setLastUpdated(timestamp);
 
@@ -127,10 +194,19 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
     setNewPassword('');
     setConfirmPassword('');
 
-    setMessage({
-      type: 'success',
-      text: 'Profile details and credentials updated successfully. New credentials will be required on next login.',
-    });
+    const res = await saveSiteConfigToDb(CONFIG_KEYS.ADMIN_PROFILE, updatedProfile);
+
+    if (res.success) {
+      setMessage({
+        type: 'success',
+        text: 'Profile details and credentials saved to Central Neon Database! New credentials active across all devices.',
+      });
+    } else {
+      setMessage({
+        type: 'success',
+        text: `Saved locally. Central DB sync notice: ${res.error || 'Connection failed'}.`,
+      });
+    }
 
     if (onProfileUpdated) {
       onProfileUpdated({ name: updatedProfile.name, username: updatedProfile.username });
@@ -387,6 +463,137 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
           </button>
         </div>
       </form>
+
+      {/* Section 3: Central Database & Backend Connectivity */}
+      <div className="pt-6 border-t border-slate-200 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#1a6c7a] flex items-center gap-1.5">
+              <Database className="w-4 h-4" />
+              <span>Central Database & Backend Connectivity</span>
+            </h4>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Monitor live Neon PostgreSQL database health, ping latency, and toggle backend environment.
+            </p>
+          </div>
+
+          {/* Test Connection / Ping Button */}
+          <button
+            type="button"
+            onClick={performHealthCheck}
+            disabled={serverHealth.isChecking}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer self-start sm:self-auto disabled:opacity-50"
+            title="Ping and test central database latency"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${serverHealth.isChecking ? 'animate-spin text-[#1a6c7a]' : ''}`} />
+            <span>{serverHealth.isChecking ? 'Testing DB...' : 'Test Connection / Ping'}</span>
+          </button>
+        </div>
+
+        {/* Database Control Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Health & Latency Card */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="relative flex items-center justify-center flex-shrink-0">
+                <span
+                  className={`w-3 h-3 rounded-full ${
+                    serverHealth.isChecking
+                      ? 'bg-amber-500 animate-pulse'
+                      : serverHealth.isOnline
+                      ? 'bg-emerald-500'
+                      : 'bg-rose-500'
+                  }`}
+                />
+                {serverHealth.isOnline && !serverHealth.isChecking && (
+                  <span className="absolute w-3 h-3 rounded-full bg-emerald-400 opacity-75 animate-ping pointer-events-none" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
+                  <span>{serverHealth.isOnline ? 'Neon PostgreSQL Connected' : 'Database Offline'}</span>
+                  {serverHealth.isOnline && (
+                    <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 font-mono font-bold rounded-full">
+                      {serverHealth.latencyMs}ms
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                  {serverHealth.isChecking
+                    ? 'Verifying handshake...'
+                    : serverHealth.isOnline
+                    ? 'Central cloud sync active & ready'
+                    : serverHealth.error || 'Server unreachable'}
+                </p>
+              </div>
+            </div>
+
+            <span
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider flex-shrink-0 ${
+                serverHealth.isOnline ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+              }`}
+            >
+              {serverHealth.isOnline ? 'Active' : 'Offline'}
+            </span>
+          </div>
+
+          {/* Environment Toggle Card */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col justify-between gap-2.5 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <Server className="w-3.5 h-3.5 text-[#1a6c7a]" />
+                <span>Backend Environment</span>
+              </span>
+              <span className="text-[10px] font-mono font-semibold text-slate-500">
+                {backendEnv === 'live' ? 'Cloud Production' : 'Local Dev'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5 bg-slate-200/70 p-1 rounded-lg text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => handleSwitchBackendEnv('live')}
+                className={`py-1.5 px-2 rounded-md transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  backendEnv === 'live'
+                    ? 'bg-white text-[#1a6c7a] shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Connect to Render Backend & Neon PostgreSQL Cloud Database"
+              >
+                <span>Cloud (Neon DB)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSwitchBackendEnv('local')}
+                className={`py-1.5 px-2 rounded-md transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  backendEnv === 'local'
+                    ? 'bg-white text-amber-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Connect to Localhost Django Backend (http://127.0.0.1:8000)"
+              >
+                <span>Localhost</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Active Endpoint & Realtime Sync Notice */}
+        <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-slate-400 font-bold text-[11px] uppercase tracking-wider flex-shrink-0">
+              Active Endpoint:
+            </span>
+            <span className="font-mono text-slate-800 font-semibold truncate text-[11px]">
+              {getApiBaseUrl()}
+            </span>
+          </div>
+          <span className="text-[11px] text-teal-700 font-semibold flex items-center gap-1 flex-shrink-0">
+            <CheckCircle className="w-3.5 h-3.5 text-teal-600" />
+            <span>Real-time central cloud synchronization</span>
+          </span>
+        </div>
+      </div>
       {/* Centered Save Success Modal Popup */}
       <SaveSuccessModal
         isOpen={message?.type === 'success'}
