@@ -14,7 +14,8 @@ import {
   ShieldCheck,
   RefreshCw,
 } from 'lucide-react';
-import { API_BASE_URL } from '../../services/databaseConfig';
+import { getApiBaseUrl } from '../../services/databaseConfig';
+import { fetchSiteConfigFromDb, saveSiteConfigToDb, CONFIG_KEYS } from '../../services/siteConfigService';
 
 interface AdminLoginProps {
   onLoginSuccess: (adminData: { username: string; name: string }) => void;
@@ -85,19 +86,35 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
   };
 
   // 1. Handle Admin Login Form Submission
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
     setIsLoading(true);
 
-    setTimeout(() => {
-      // Validate credentials against stored admin profile in localStorage
-      const storedCredsRaw = localStorage.getItem('sain_admin_profile');
-      let validUser = 'sain_sakib6055';
-      let validPass = 'admin123';
-      let adminName = 'Sakib Ahmed (Super Administrator)';
+    let validUser = 'sain_sakib6055';
+    let validPass = 'admin123';
+    let adminName = 'Sakib Ahmed (Super Administrator)';
 
+    try {
+      // Validate credentials against Central Neon DB first so password changes on any device work instantly
+      const remote = await fetchSiteConfigFromDb<any>(CONFIG_KEYS.ADMIN_PROFILE, null);
+      if (remote && remote.username) {
+        validUser = remote.username;
+        if (remote.password) validPass = remote.password;
+        if (remote.name) adminName = remote.name;
+        localStorage.setItem('sain_admin_profile', JSON.stringify(remote));
+      } else {
+        const storedCredsRaw = localStorage.getItem('sain_admin_profile');
+        if (storedCredsRaw) {
+          const parsed = JSON.parse(storedCredsRaw);
+          if (parsed.username) validUser = parsed.username;
+          if (parsed.password) validPass = parsed.password;
+          if (parsed.name) adminName = parsed.name;
+        }
+      }
+    } catch {
+      const storedCredsRaw = localStorage.getItem('sain_admin_profile');
       if (storedCredsRaw) {
         try {
           const parsed = JSON.parse(storedCredsRaw);
@@ -108,21 +125,21 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
           // ignore
         }
       }
+    }
 
-      const inputUser = username.trim();
-      const inputPass = password.trim();
+    const inputUser = username.trim();
+    const inputPass = password.trim();
 
-      if (
-        (inputUser.toLowerCase() === validUser.toLowerCase() || inputUser.toLowerCase() === 'admin') &&
-        (inputPass === validPass || inputPass === 'admin123' || inputPass === 'sain2026')
-      ) {
-        setIsLoading(false);
-        onLoginSuccess({ username: inputUser, name: adminName });
-      } else {
-        setIsLoading(false);
-        setError('Invalid username or password. Please verify your credentials.');
-      }
-    }, 400);
+    if (
+      (inputUser.toLowerCase() === validUser.toLowerCase() || inputUser.toLowerCase() === 'admin') &&
+      (inputPass === validPass || inputPass === 'admin123' || inputPass === 'sain2026')
+    ) {
+      setIsLoading(false);
+      onLoginSuccess({ username: inputUser, name: adminName });
+    } else {
+      setIsLoading(false);
+      setError('Invalid username or password. Please verify your credentials.');
+    }
   };
 
   // 2. Handle Forgot Password Submission (Sends Reset Link via SMTP)
@@ -143,7 +160,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
     const smtpConfig = getSmtpConfig();
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/auth/forgot-password/`, {
+      const res = await fetch(`${getApiBaseUrl()}/api/v1/auth/forgot-password/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
@@ -242,11 +259,12 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
       }
 
       localStorage.setItem('sain_admin_profile', JSON.stringify(profile));
+      saveSiteConfigToDb(CONFIG_KEYS.ADMIN_PROFILE, profile);
 
       // 2. Call backend reset endpoint if token exists
       if (resetToken && !resetToken.startsWith('local_')) {
         try {
-          await fetch(`${API_BASE_URL}/api/v1/auth/reset-password/`, {
+          await fetch(`${getApiBaseUrl()}/api/v1/auth/reset-password/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
             body: JSON.stringify({
