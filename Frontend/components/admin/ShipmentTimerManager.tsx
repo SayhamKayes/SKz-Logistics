@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { SaveSuccessModal } from './SaveSuccessModal';
-import { saveSiteConfigToDb } from '../../services/siteConfigService';
+import { saveSiteConfigToDb, fetchSiteConfigFromDb, CONFIG_KEYS } from '../../services/siteConfigService';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -60,7 +60,17 @@ export const ShipmentTimerManager: React.FC = () => {
     return DEFAULT_SHIPMENT_TIMERS;
   });
 
-  const [saved, setSaved] = useState(false);
+  const [saveModal, setSaveModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'warning' | 'error';
+  }>({
+    isOpen: false,
+    title: 'Timers Changes Saved!',
+    message: 'Active shipment timers and arrival schedules are now live across the website.',
+    type: 'success',
+  });
   const [activeTab, setActiveTab] = useState<'all' | ShipmentMode>('all');
   const [now, setNow] = useState(Date.now());
 
@@ -90,8 +100,15 @@ export const ShipmentTimerManager: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Sync state when restored from History or updated externally
+  // Sync state when restored from History or updated externally, and fetch from Central DB on mount
   useEffect(() => {
+    fetchSiteConfigFromDb<ShipmentTimerHeaderConfig>(CONFIG_KEYS.SHIPMENT_TIMERS_HEADER, DEFAULT_SHIPMENT_TIMER_HEADER).then((remote) => {
+      if (remote) setHeaderConfig(remote);
+    });
+    fetchSiteConfigFromDb<ShipmentTimerItem[]>(CONFIG_KEYS.SHIPMENT_TIMERS, DEFAULT_SHIPMENT_TIMERS).then((remote) => {
+      if (Array.isArray(remote) && remote.length > 0) setTimers(remote);
+    });
+
     const handleSync = () => {
       try {
         const storedTimers = localStorage.getItem(TIMERS_STORAGE_KEY);
@@ -277,13 +294,34 @@ export const ShipmentTimerManager: React.FC = () => {
     });
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveSiteConfigToDb(TIMERS_STORAGE_KEY, timers);
-    saveSiteConfigToDb(TIMERS_HEADER_STORAGE_KEY, headerConfig);
+    localStorage.setItem(TIMERS_STORAGE_KEY, JSON.stringify(timers));
+    localStorage.setItem(TIMERS_HEADER_STORAGE_KEY, JSON.stringify(headerConfig));
     window.dispatchEvent(new Event(TIMERS_UPDATED_EVENT));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+
+    const [res1, res2] = await Promise.all([
+      saveSiteConfigToDb(TIMERS_STORAGE_KEY, timers),
+      saveSiteConfigToDb(TIMERS_HEADER_STORAGE_KEY, headerConfig),
+    ]);
+
+    const isAllOk = res1.success && res2.success;
+    if (isAllOk) {
+      setSaveModal({
+        isOpen: true,
+        title: 'Timers Changes Saved!',
+        message: 'Active shipment timers and arrival schedules are saved to Central Neon Database and live across all devices.',
+        type: 'success',
+      });
+    } else {
+      setSaveModal({
+        isOpen: true,
+        title: 'Saved Locally (Sync Warning)',
+        message: `Saved to browser storage. Central DB sync notice: ${res1.error || res2.error || 'Connection failed'}.`,
+        type: 'warning',
+      });
+    }
+    setTimeout(() => setSaveModal((prev) => ({ ...prev, isOpen: false })), 3500);
   };
 
   const handleResetDefaults = () => {
@@ -293,15 +331,17 @@ export const ShipmentTimerManager: React.FC = () => {
       message: 'Are you sure you want to reset all schedules back to the default Guangzhou, Hong Kong & Sea freight timers? Any customized schedules will be overwritten.',
       confirmText: 'Reset to Defaults',
       type: 'warning',
-      onConfirm: () => {
+      onConfirm: async () => {
         setTimers(DEFAULT_SHIPMENT_TIMERS);
         setHeaderConfig(DEFAULT_SHIPMENT_TIMER_HEADER);
         setExpandedIds(new Set());
         localStorage.setItem(TIMERS_STORAGE_KEY, JSON.stringify(DEFAULT_SHIPMENT_TIMERS));
         localStorage.setItem(TIMERS_HEADER_STORAGE_KEY, JSON.stringify(DEFAULT_SHIPMENT_TIMER_HEADER));
-        saveSiteConfigToDb(TIMERS_STORAGE_KEY, DEFAULT_SHIPMENT_TIMERS);
-        saveSiteConfigToDb(TIMERS_HEADER_STORAGE_KEY, DEFAULT_SHIPMENT_TIMER_HEADER);
         window.dispatchEvent(new Event(TIMERS_UPDATED_EVENT));
+        await Promise.all([
+          saveSiteConfigToDb(TIMERS_STORAGE_KEY, DEFAULT_SHIPMENT_TIMERS),
+          saveSiteConfigToDb(TIMERS_HEADER_STORAGE_KEY, DEFAULT_SHIPMENT_TIMER_HEADER),
+        ]);
         setConfirmModal(null);
       },
     });
@@ -334,7 +374,7 @@ export const ShipmentTimerManager: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {saved && (
+          {saveModal.isOpen && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold animate-in fade-in">
               <CheckCircle className="w-4 h-4" />
               <span>Saved & Live on Homepage</span>
@@ -1047,9 +1087,10 @@ export const ShipmentTimerManager: React.FC = () => {
       )}
       {/* Centered Save Success Modal Popup */}
       <SaveSuccessModal
-        isOpen={saved}
-        title="Timers Changes Saved!"
-        message="Active shipment timers and arrival schedules are now live across the website."
+        isOpen={saveModal.isOpen}
+        title={saveModal.title}
+        message={saveModal.message}
+        type={saveModal.type}
       />
     </div>
   );
