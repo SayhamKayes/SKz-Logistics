@@ -14,6 +14,7 @@ import {
   ChevronRight,
   ArrowRight,
 } from 'lucide-react';
+import { fetchSiteConfigFromDb, CONFIG_KEYS } from '../services/siteConfigService';
 
 interface ServicesSectionProps {
   fullGrid?: boolean;
@@ -127,6 +128,27 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ fullGrid = fal
       window.removeEventListener('sain_services_content_updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
     };
+  }, []);
+
+  // Fetch latest service offerings & header from Central Neon DB on mount
+  useEffect(() => {
+    fetchSiteConfigFromDb<ServiceCard[]>(CONFIG_KEYS.SERVICES_CONTENT, DEFAULT_SERVICE_CARDS).then((remote) => {
+      if (remote && Array.isArray(remote) && remote.length > 0) {
+        setServices(remote.map((item: any) => ({
+          id: item.id || `service-${Date.now()}`,
+          title: item.title || 'Untitled Service',
+          image: item.image || '',
+          description: item.fullDescription || item.description || '',
+          features: Array.isArray(item.features) ? item.features : [],
+        })));
+      }
+    });
+
+    fetchSiteConfigFromDb<ServicesSectionHeaderConfig>(CONFIG_KEYS.SERVICES_HEADER, DEFAULT_SERVICES_HEADER).then((remote) => {
+      if (remote && remote.title) {
+        setHeaderConfig(remote);
+      }
+    });
   }, []);
 
   // Seamless jump re-centering: re-enable CSS transition after instantaneous position reset
