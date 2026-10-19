@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTracking } from '../../Context/TrackingContext';
 import { Consignment, PackageItem, ShipmentHistoryItem, getStatusProgressAndColor, buildConsignmentTimeline, normalizeStatus, getBangladeshDateTime } from '../../services/trackingData';
 import { recordAdminHistory } from '../../services/adminHistoryService';
+import { saveSiteConfigToDb, fetchSiteConfigFromDb, CONFIG_KEYS } from '../../services/siteConfigService';
 import { WaybillPrintModal } from './WaybillPrintModal';
 import { ConfirmModal } from './ConfirmModal';
 import {
@@ -125,8 +126,32 @@ export const ShipmentManager: React.FC = () => {
       const stored = localStorage.getItem('sain_custom_employees');
       if (stored) return JSON.parse(stored);
     } catch { }
-    return DEFAULT_EMPLOYEES;
   });
+
+  // Sync custom dropdown catalogs and trash from Central Neon DB on mount
+  useEffect(() => {
+    fetchSiteConfigFromDb<string[]>(CONFIG_KEYS.CUSTOM_ORIGINS, DEFAULT_ORIGINS).then((res) => {
+      if (Array.isArray(res) && res.length > 0) setOrigins(res);
+    });
+    fetchSiteConfigFromDb<string[]>(CONFIG_KEYS.CUSTOM_DESTINATIONS, DEFAULT_DESTINATIONS).then((res) => {
+      if (Array.isArray(res) && res.length > 0) setDestinations(res);
+    });
+    fetchSiteConfigFromDb<string[]>(CONFIG_KEYS.CUSTOM_AGENTS, DEFAULT_AGENTS).then((res) => {
+      if (Array.isArray(res) && res.length > 0) setAgents(res);
+    });
+    fetchSiteConfigFromDb<string[]>(CONFIG_KEYS.CUSTOM_CLIENTS, DEFAULT_CLIENTS).then((res) => {
+      if (Array.isArray(res) && res.length > 0) setClients(res);
+    });
+    fetchSiteConfigFromDb<string[]>(CONFIG_KEYS.CUSTOM_EMPLOYEES, DEFAULT_EMPLOYEES).then((res) => {
+      if (Array.isArray(res) && res.length > 0) setEmployees(res);
+    });
+    fetchSiteConfigFromDb<Record<string, { consignment: Consignment; trashedAt: string }>>(
+      CONFIG_KEYS.TRASHED_CONSIGNMENTS,
+      {}
+    ).then((res) => {
+      if (res && typeof res === 'object') setTrashedConsignments(res);
+    });
+  }, []);
 
   // Inline Add Input States
   const [showAddOrigin, setShowAddOrigin] = useState(false);
@@ -473,7 +498,7 @@ export const ShipmentManager: React.FC = () => {
   };
 
   // ==========================================================
-  // CUSTOM ORIGIN & DESTINATION ADDERS
+  // CUSTOM ORIGIN & DESTINATION ADDERS (Synced with Central Database)
   // ==========================================================
   const handleAddCustomOrigin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -483,6 +508,7 @@ export const ShipmentManager: React.FC = () => {
       setOrigins(updated);
       setOrigin(val);
       localStorage.setItem('sain_custom_origins', JSON.stringify(updated));
+      saveSiteConfigToDb(CONFIG_KEYS.CUSTOM_ORIGINS, updated);
       setNewOriginInput('');
       setShowAddOrigin(false);
     }
@@ -496,6 +522,7 @@ export const ShipmentManager: React.FC = () => {
       setDestinations(updated);
       setDestination(val);
       localStorage.setItem('sain_custom_destinations', JSON.stringify(updated));
+      saveSiteConfigToDb(CONFIG_KEYS.CUSTOM_DESTINATIONS, updated);
       setNewDestInput('');
       setShowAddDest(false);
     }
@@ -509,6 +536,7 @@ export const ShipmentManager: React.FC = () => {
       setAgents(updated);
       setSelectedAgent(val);
       localStorage.setItem('sain_custom_agents', JSON.stringify(updated));
+      saveSiteConfigToDb(CONFIG_KEYS.CUSTOM_AGENTS, updated);
       setNewAgentInput('');
       setShowAddAgent(false);
     }
@@ -522,6 +550,7 @@ export const ShipmentManager: React.FC = () => {
       setClients(updated);
       setClient(val);
       localStorage.setItem('sain_custom_clients', JSON.stringify(updated));
+      saveSiteConfigToDb(CONFIG_KEYS.CUSTOM_CLIENTS, updated);
       setNewClientInput('');
       setShowAddClient(false);
     }
@@ -532,6 +561,7 @@ export const ShipmentManager: React.FC = () => {
     setClients(updated);
     if (client === clientToRemove) setClient(updated[0] || '-- Select Client --');
     localStorage.setItem('sain_custom_clients', JSON.stringify(updated));
+    saveSiteConfigToDb(CONFIG_KEYS.CUSTOM_CLIENTS, updated);
   };
 
   const handleAddCustomEmployee = (e: React.FormEvent) => {
@@ -542,6 +572,7 @@ export const ShipmentManager: React.FC = () => {
       setEmployees(updated);
       setEmployee(val);
       localStorage.setItem('sain_custom_employees', JSON.stringify(updated));
+      saveSiteConfigToDb(CONFIG_KEYS.CUSTOM_EMPLOYEES, updated);
       setNewEmployeeInput('');
       setShowAddEmployee(false);
     }
@@ -552,6 +583,7 @@ export const ShipmentManager: React.FC = () => {
     setEmployees(updated);
     if (employee === empToRemove) setEmployee(updated[0] || '-- Select Employee --');
     localStorage.setItem('sain_custom_employees', JSON.stringify(updated));
+    saveSiteConfigToDb(CONFIG_KEYS.CUSTOM_EMPLOYEES, updated);
   };
 
   const handleRemoveDestination = (destToRemove: string) => {
@@ -560,6 +592,7 @@ export const ShipmentManager: React.FC = () => {
     setDestinations(updated);
     if (destination === destToRemove) setDestination(updated[0]);
     localStorage.setItem('sain_custom_destinations', JSON.stringify(updated));
+    saveSiteConfigToDb(CONFIG_KEYS.CUSTOM_DESTINATIONS, updated);
   };
 
   const handleRemoveOrigin = (origToRemove: string) => {
@@ -568,6 +601,7 @@ export const ShipmentManager: React.FC = () => {
     setOrigins(updated);
     if (origin === origToRemove) setOrigin(updated[0]);
     localStorage.setItem('sain_custom_origins', JSON.stringify(updated));
+    saveSiteConfigToDb(CONFIG_KEYS.CUSTOM_ORIGINS, updated);
   };
 
   const handleRemoveAgent = (agentToRemove: string) => {
@@ -575,6 +609,7 @@ export const ShipmentManager: React.FC = () => {
     setAgents(updated);
     if (selectedAgent === agentToRemove) setSelectedAgent(updated[0] || '-- Select Agent --');
     localStorage.setItem('sain_custom_agents', JSON.stringify(updated));
+    saveSiteConfigToDb(CONFIG_KEYS.CUSTOM_AGENTS, updated);
   };
 
   const handleRemoveCategory = (catToRemove: string) => {
@@ -586,7 +621,7 @@ export const ShipmentManager: React.FC = () => {
   // ==========================================================
   // ADD NEW BILL (Create new blank consignment with unique SAINEX number)
   // ==========================================================
-  const handleAddNewBill = () => {
+  const handleAddNewBill = async () => {
     let newBillNo = '';
     let counter = 0;
     do {
@@ -717,9 +752,13 @@ export const ShipmentManager: React.FC = () => {
       },
     };
 
-    addConsignment(newTemplateConsignment);
+    const syncRes = await addConsignment(newTemplateConsignment);
     setSelectedNo(newBillNo);
-    setSaveSuccessMsg(`New Bill template generated (${newBillNo})! Fill details and click Update to save.`);
+    if (syncRes && syncRes.success) {
+      setSaveSuccessMsg(`New Bill ${newBillNo} created & registered in Central Neon Database! Fill details and click Update to save.`);
+    } else {
+      setSaveSuccessMsg(`New Bill template generated (${newBillNo})! (Saved locally: ${syncRes?.error || 'central DB offline'}).`);
+    }
     setTimeout(() => setSaveSuccessMsg(null), 6000);
   };
 
@@ -744,6 +783,7 @@ export const ShipmentManager: React.FC = () => {
         };
         setTrashedConsignments(updatedTrash);
         localStorage.setItem('sain_trashed_consignments', JSON.stringify(updatedTrash));
+        saveSiteConfigToDb(CONFIG_KEYS.TRASHED_CONSIGNMENTS, updatedTrash);
 
         try {
           recordAdminHistory({
@@ -757,7 +797,7 @@ export const ShipmentManager: React.FC = () => {
           });
         } catch {}
 
-        setSaveSuccessMsg(`Consignment ${consignmentNo} moved to Trash (Recycle Bin).`);
+        setSaveSuccessMsg(`Consignment ${consignmentNo} moved to Trash (Recycle Bin & Database).`);
         setTimeout(() => setSaveSuccessMsg(null), 3500);
 
         // Select another active consignment
@@ -778,6 +818,7 @@ export const ShipmentManager: React.FC = () => {
     delete copy[noToRestore];
     setTrashedConsignments(copy);
     localStorage.setItem('sain_trashed_consignments', JSON.stringify(copy));
+    saveSiteConfigToDb(CONFIG_KEYS.TRASHED_CONSIGNMENTS, copy);
 
     setSelectedNo(noToRestore);
     setViewTab('active');
@@ -810,6 +851,7 @@ export const ShipmentManager: React.FC = () => {
         delete copy[noToDelete];
         setTrashedConsignments(copy);
         localStorage.setItem('sain_trashed_consignments', JSON.stringify(copy));
+        saveSiteConfigToDb(CONFIG_KEYS.TRASHED_CONSIGNMENTS, copy);
         try {
           await deleteConsignment(noToDelete);
         } catch (e) {
@@ -959,7 +1001,7 @@ export const ShipmentManager: React.FC = () => {
     };
 
     try {
-      await updateConsignment(updated);
+      const syncRes = await updateConsignment(updated);
       setSelectedNo(cleanNo);
       setPublishCurrentStatus(liveStatus);
       setStatusToast({
@@ -970,9 +1012,14 @@ export const ShipmentManager: React.FC = () => {
         time: effectiveTime,
         remarks: publishRemarks,
       });
-      setTimeout(() => setStatusToast(null), 2000);
-      setSaveSuccessMsg(`Bill ${updated.consignmentNo} updated successfully! Live tracking synchronized in real time.`);
-      setTimeout(() => setSaveSuccessMsg(null), 4000);
+      setTimeout(() => setStatusToast(null), 2500);
+
+      if (syncRes && syncRes.success) {
+        setSaveSuccessMsg(`Bill ${updated.consignmentNo} updated & saved to Central Neon Database! Live tracking synchronized in real time.`);
+      } else {
+        setSaveSuccessMsg(`Saved locally in browser cache. ⚠️ Central Database sync warning: ${syncRes?.error || 'Server unreachable'}`);
+      }
+      setTimeout(() => setSaveSuccessMsg(null), 5000);
 
       // Record into Admin Activity History Memory
       try {
@@ -1008,8 +1055,8 @@ export const ShipmentManager: React.FC = () => {
         time: effectiveTime,
         remarks: publishRemarks,
       });
-      setTimeout(() => setStatusToast(null), 2000);
-      setSaveSuccessMsg(`Saved locally: ${err?.message || 'Ready for tracking'}`);
+      setTimeout(() => setStatusToast(null), 2500);
+      setSaveSuccessMsg(`Saved locally in browser cache: ${err?.message || 'Ready for tracking'}`);
       setTimeout(() => setSaveSuccessMsg(null), 4000);
     }
   };
