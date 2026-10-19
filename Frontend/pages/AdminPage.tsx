@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useTracking } from '../Context/TrackingContext';
-import { API_BASE_URL } from '../services/databaseConfig';
+import {
+  API_BASE_URL,
+  getApiBaseUrl,
+  getBackendEnv,
+  setBackendEnv,
+  checkBackendHealth,
+  LIVE_BACKEND_URL,
+  LOCAL_BACKEND_URL,
+} from '../services/databaseConfig';
 import { AdminLogin } from '../components/admin/AdminLogin';
 import { AdminSidebar, AdminSection } from '../components/admin/AdminSidebar';
 import { ShipmentManager } from '../components/admin/ShipmentManager';
@@ -19,10 +27,13 @@ import {
   Server,
   Activity,
   CheckCircle,
-  Database,
+  AlertTriangle,
   Bell,
   Menu,
   X,
+  RefreshCw,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 
 export const AdminPage: React.FC = () => {
@@ -60,33 +71,44 @@ export const AdminPage: React.FC = () => {
   // Active section
   const [currentSection, setCurrentSection] = useState<AdminSection>('shipments');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
-  // Check Django DRF backend health
+  // Live Database & Server Health State
+  const [backendEnv, setBackendEnvState] = useState<'live' | 'local'>(getBackendEnv());
+  const [serverHealth, setServerHealth] = useState<{
+    isOnline: boolean;
+    latencyMs: number;
+    isChecking: boolean;
+    error?: string;
+  }>({
+    isOnline: true,
+    latencyMs: 0,
+    isChecking: true,
+  });
+
+  // Check Django DRF backend & Neon PostgreSQL health
+  const performHealthCheck = async () => {
+    setServerHealth((prev) => ({ ...prev, isChecking: true }));
+    const result = await checkBackendHealth();
+    setServerHealth({
+      isOnline: result.isOnline,
+      latencyMs: result.latencyMs,
+      isChecking: false,
+      error: result.error,
+    });
+  };
+
   useEffect(() => {
-    let isMounted = true;
-    const checkBackend = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/couriers/track/SAINEX067638406/`);
-        if (isMounted) {
-          if (res.ok) {
-            setServerStatus('online');
-          } else {
-            setServerStatus('online'); // endpoint responded
-          }
-        }
-      } catch {
-        if (isMounted) {
-          // If offline or blocked by browser CORS, local SQLite sync is still active
-          setServerStatus('online');
-        }
-      }
-    };
-    checkBackend();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    performHealthCheck();
+    // Re-check health every 45 seconds to keep connection monitored
+    const interval = setInterval(performHealthCheck, 45000);
+    return () => clearInterval(interval);
+  }, [backendEnv]);
+
+  const handleSwitchBackendEnv = (newEnv: 'live' | 'local') => {
+    setBackendEnv(newEnv);
+    setBackendEnvState(newEnv);
+    setTimeout(performHealthCheck, 100);
+  };
 
   const handleLoginSuccess = (user: { username: string; name: string }) => {
     sessionStorage.setItem('sain_admin_auth_status', 'authenticated');
@@ -207,14 +229,13 @@ export const AdminPage: React.FC = () => {
           </div>
 
           {/* Quick info and shortcuts */}
-          <div className="flex items-center gap-3">
-
+          <div className="flex flex-wrap items-center gap-2.5">
             {/* View live site button */}
             <a
               href="/"
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
               title="Open Live Public Website in a new tab"
             >
               <ExternalLink className="w-3.5 h-3.5 text-[#1a6c7a]" />
@@ -236,6 +257,29 @@ export const AdminPage: React.FC = () => {
             </button>
           </div>
         </header>
+
+        {/* Offline Warning Banner if Database is Unreachable */}
+        {!serverHealth.isOnline && !serverHealth.isChecking && (
+          <div className="bg-rose-50 border-b border-rose-200 px-6 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-rose-900 animate-in fade-in duration-200">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+              <div>
+                <span className="font-bold">⚠️ Central Database Unreachable ({getApiBaseUrl()}): </span>
+                <span>
+                  Render server may be waking up or offline. Changes you make now will be saved in your browser cache and synchronized when connection is established.
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={performHealthCheck}
+              className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold transition cursor-pointer flex items-center gap-1.5"
+            >
+              <RefreshCw className="w-3 h-3" />
+              <span>Reconnect Now</span>
+            </button>
+          </div>
+        )}
 
         {/* Content Container */}
         <div className="p-4 sm:p-6 lg:p-8 space-y-6">
