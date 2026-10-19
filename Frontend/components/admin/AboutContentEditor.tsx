@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Save, CheckCircle, Info, Upload, Trash2, RotateCcw, Target, Compass, Award, TrendingUp, ShieldCheck, ExternalLink, Loader2 } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { SaveSuccessModal } from './SaveSuccessModal';
-import { saveSiteConfigToDb } from '../../services/siteConfigService';
+import { saveSiteConfigToDb, fetchSiteConfigFromDb, CONFIG_KEYS } from '../../services/siteConfigService';
 import { uploadMediaToCloudinary } from '../../services/uploadService';
 import { RichParagraphEditor } from './RichParagraphEditor';
 
@@ -68,7 +68,17 @@ export const AboutContentEditor: React.FC = () => {
   });
 
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saveModal, setSaveModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'warning' | 'error';
+  }>({
+    isOpen: false,
+    title: 'About Changes Saved!',
+    message: 'About Us content and values are now live across the website.',
+    type: 'success',
+  });
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -78,8 +88,14 @@ export const AboutContentEditor: React.FC = () => {
     onConfirm: () => void;
   } | null>(null);
 
-  // Sync state when restored from History or updated externally
+  // Sync state when restored from History or updated externally, and fetch from Central DB on mount
   useEffect(() => {
+    fetchSiteConfigFromDb<AboutConfig>(CONFIG_KEYS.ABOUT_CONTENT, DEFAULT_ABOUT_CONFIG).then((remote) => {
+      if (remote) {
+        setConfig((prev) => ({ ...prev, ...remote }));
+      }
+    });
+
     const handleSync = () => {
       try {
         const stored = localStorage.getItem('sain_about_content_config');
@@ -153,12 +169,28 @@ export const AboutContentEditor: React.FC = () => {
     setConfig((prev) => ({ ...prev, image: DEFAULT_ABOUT_CONFIG.image }));
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveSiteConfigToDb('sain_about_content_config', config);
+    localStorage.setItem('sain_about_content_config', JSON.stringify(config));
     window.dispatchEvent(new Event('sain_about_content_updated'));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+
+    const res = await saveSiteConfigToDb(CONFIG_KEYS.ABOUT_CONTENT, config);
+    if (res.success) {
+      setSaveModal({
+        isOpen: true,
+        title: 'About Changes Saved!',
+        message: 'About Us content and values are saved to Central Neon Database and live across all devices.',
+        type: 'success',
+      });
+    } else {
+      setSaveModal({
+        isOpen: true,
+        title: 'Saved Locally (Sync Warning)',
+        message: `Saved to browser storage. Central DB sync notice: ${res.error || 'Connection failed'}.`,
+        type: 'warning',
+      });
+    }
+    setTimeout(() => setSaveModal((prev) => ({ ...prev, isOpen: false })), 3500);
   };
 
   const handleResetDefaults = () => {
@@ -168,11 +200,11 @@ export const AboutContentEditor: React.FC = () => {
       message: 'Are you sure you want to reset all About Us text, images, mission, vision, and values back to defaults?',
       confirmText: 'Reset to Defaults',
       type: 'warning',
-      onConfirm: () => {
+      onConfirm: async () => {
         setConfig(DEFAULT_ABOUT_CONFIG);
         localStorage.setItem('sain_about_content_config', JSON.stringify(DEFAULT_ABOUT_CONFIG));
-        saveSiteConfigToDb('sain_about_content_config', DEFAULT_ABOUT_CONFIG);
         window.dispatchEvent(new Event('sain_about_content_updated'));
+        await saveSiteConfigToDb(CONFIG_KEYS.ABOUT_CONTENT, DEFAULT_ABOUT_CONFIG);
         setConfirmModal(null);
       },
     });
@@ -192,7 +224,7 @@ export const AboutContentEditor: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {saved && (
+          {saveModal.isOpen && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold animate-in fade-in">
               <CheckCircle className="w-4 h-4" />
               <span>Saved & Updated Live</span>
@@ -592,9 +624,10 @@ export const AboutContentEditor: React.FC = () => {
       )}
       {/* Centered Save Success Modal Popup */}
       <SaveSuccessModal
-        isOpen={saved}
-        title="About Changes Saved!"
-        message="About Us content and values are now live across the website."
+        isOpen={saveModal.isOpen}
+        title={saveModal.title}
+        message={saveModal.message}
+        type={saveModal.type}
       />
     </div>
   );
