@@ -195,7 +195,7 @@ export const ShipmentTimerSection: React.FC = () => {
                   : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
               }`}
             >
-              <Plane className="w-3.5 h-3.5 text-amber-400" />
+              <Plane className="w-3.5 h-3.5 text-blue-400" />
               <span>Air Freight ({counts.air})</span>
             </button>
 
@@ -367,7 +367,13 @@ const ShipmentCountdownCard: React.FC<ShipmentCountdownCardProps> = ({
   }, [timer.targetArrivalDate]);
 
   return (
-    <div className="group relative bg-[#0f1d26]/90 border border-slate-700/80 hover:border-amber-400/50 rounded-3xl p-5 sm:p-6 shadow-2xl backdrop-blur-xl transition-all duration-300 hover:shadow-amber-500/10 flex flex-col justify-between h-full">
+    <div
+      className={`group relative bg-[#0f1d26]/90 border border-slate-700/80 ${
+        timer.mode === 'air'
+          ? 'hover:border-blue-400/50 hover:shadow-blue-500/10'
+          : 'hover:border-emerald-400/50 hover:shadow-emerald-500/10'
+      } rounded-3xl p-5 sm:p-6 shadow-2xl backdrop-blur-xl transition-all duration-300 flex flex-col justify-between h-full`}
+    >
       {/* Top Header: Badge, Mode, and Status */}
       <div>
         <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-slate-800">
@@ -375,7 +381,7 @@ const ShipmentCountdownCard: React.FC<ShipmentCountdownCardProps> = ({
             <span
               className={`p-2 rounded-xl flex items-center justify-center ${
                 timer.mode === 'air'
-                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                   : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
               }`}
             >
@@ -393,11 +399,17 @@ const ShipmentCountdownCard: React.FC<ShipmentCountdownCardProps> = ({
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/90 border border-slate-700">
             <span
               className={`w-2 h-2 rounded-full ${
-                isArrived
-                  ? 'bg-blue-400'
+                timer.mode === 'air'
+                  ? isArrived
+                    ? 'bg-blue-400'
+                    : timer.status === 'in_transit'
+                    ? 'bg-blue-400 animate-pulse'
+                    : 'bg-blue-400'
+                  : isArrived
+                  ? 'bg-emerald-400'
                   : timer.status === 'in_transit'
                   ? 'bg-emerald-400 animate-pulse'
-                  : 'bg-amber-400'
+                  : 'bg-emerald-400'
               }`}
             />
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">
@@ -408,11 +420,15 @@ const ShipmentCountdownCard: React.FC<ShipmentCountdownCardProps> = ({
 
         {/* Title and Vessel/Flight Info */}
         <div className="mt-3.5">
-          <h3 className="text-base sm:text-lg font-bold text-white group-hover:text-amber-300 transition-colors line-clamp-1">
+          <h3
+            className={`text-base sm:text-lg font-bold text-white ${
+              timer.mode === 'air' ? 'group-hover:text-blue-300' : 'group-hover:text-emerald-300'
+            } transition-colors line-clamp-1`}
+          >
             {timer.title}
           </h3>
           <p className="text-xs font-mono font-semibold text-slate-400 mt-0.5 flex items-center gap-1.5">
-            <span className="text-amber-400 font-bold">•</span>
+            <span className={timer.mode === 'air' ? 'text-blue-400 font-bold' : 'text-emerald-400 font-bold'}>•</span>
             <span className="truncate">{timer.flightOrVessel}</span>
           </p>
         </div>
@@ -421,7 +437,7 @@ const ShipmentCountdownCard: React.FC<ShipmentCountdownCardProps> = ({
         <div className="mt-4 bg-slate-900/80 border border-slate-800 rounded-2xl p-3.5">
           <div className="flex items-center justify-between text-xs font-bold text-slate-200">
             <div className="flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-amber-400" />
+              <MapPin className={`w-3.5 h-3.5 ${timer.mode === 'air' ? 'text-blue-400' : 'text-amber-400'}`} />
               <span>{timer.originCity}</span>
             </div>
             <div className="flex items-center gap-1.5 text-right">
@@ -436,7 +452,7 @@ const ShipmentCountdownCard: React.FC<ShipmentCountdownCardProps> = ({
               <div
                 className={`h-full transition-all duration-700 ${
                   timer.mode === 'air'
-                    ? 'bg-gradient-to-r from-amber-500 to-amber-300'
+                    ? 'bg-gradient-to-r from-blue-500 to-sky-300'
                     : 'bg-gradient-to-r from-emerald-500 to-teal-300'
                 }`}
                 style={{ width: `${progressPercent}%` }}
@@ -445,7 +461,11 @@ const ShipmentCountdownCard: React.FC<ShipmentCountdownCardProps> = ({
 
             {/* Moving marker */}
             <div
-              className="absolute -top-2.5 transition-all duration-700 -translate-x-1/2 p-1 rounded-full bg-slate-900 border border-amber-400 text-amber-300 shadow-md"
+              className={`absolute -top-2.5 transition-all duration-700 -translate-x-1/2 p-1 rounded-full bg-slate-900 shadow-md ${
+                timer.mode === 'air'
+                  ? 'border border-blue-400 text-blue-300'
+                  : 'border border-emerald-400 text-emerald-300'
+              }`}
               style={{ left: `${progressPercent}%` }}
             >
               {timer.mode === 'air' ? (
@@ -458,7 +478,7 @@ const ShipmentCountdownCard: React.FC<ShipmentCountdownCardProps> = ({
 
           <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1.5 font-medium">
             <span>Departed: {departureDateFormatted}</span>
-            <span className="text-amber-300 font-bold">
+            <span className={timer.mode === 'air' ? 'text-blue-300 font-bold' : 'text-emerald-300 font-bold'}>
               ETA: {arrivalDateFormatted}
             </span>
           </div>
