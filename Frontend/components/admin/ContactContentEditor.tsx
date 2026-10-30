@@ -188,7 +188,7 @@ export const ContactContentEditor: React.FC = () => {
       setSaveModal({
         isOpen: true,
         title: 'Contact Changes Saved!',
-        message: 'Contact information and office locations are saved to Central Neon Database and live across all devices.',
+        message: 'Contact information and office locations are saved to Central Database and live across all devices.',
         type: 'success',
       });
     } else {
