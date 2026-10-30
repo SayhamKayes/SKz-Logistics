@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface UseHeroScrollVideoOptions {
   videoSrc?: string;
-  smoothing?: number; // 0.12 to 0.20 for responsive, buttery smooth scrubbing
+  smoothing?: number; // 0.12 to 0.20 for responsive, buttery smooth progress
 }
 
 export function useHeroScrollVideo({
@@ -19,14 +19,14 @@ export function useHeroScrollVideo({
   const targetProgressRef = useRef(0);
   const currentProgressRef = useRef(0);
   const isSeekingRef = useRef(false);
-  const seekTimeoutRef = useRef<number | null>(null);
   const rafIdRef = useRef<number | null>(null);
 
-  // Metadata loaded callback
+  // Metadata loaded callback - video is strictly paused, initialized to 0.01s frame
   const handleLoadedMetadata = useCallback(() => {
-    const video = videoRef.current;
-    if (video) {
-      video.pause();
+    const vid = videoRef.current;
+    if (vid) {
+      vid.pause();
+      vid.currentTime = 0.01;
       setIsReady(true);
     }
   }, []);
@@ -34,35 +34,23 @@ export function useHeroScrollVideo({
   // Seek completed listener
   const handleSeeked = useCallback(() => {
     isSeekingRef.current = false;
-    if (seekTimeoutRef.current) {
-      window.clearTimeout(seekTimeoutRef.current);
-      seekTimeoutRef.current = null;
-    }
   }, []);
 
-  // Check initial video ready state on mount
+  // Check initial video ready state on mount (strictly paused, no autoplay)
   useEffect(() => {
-    const video = videoRef.current;
-    if (video) {
-      if (video.readyState >= 1) {
-        video.pause();
+    const vid = videoRef.current;
+    if (vid) {
+      vid.pause();
+      vid.defaultMuted = true;
+      vid.muted = true;
+      if (vid.readyState >= 1) {
+        vid.currentTime = 0.01;
         setIsReady(true);
       }
-      const onSeeked = () => {
-        isSeekingRef.current = false;
-        if (seekTimeoutRef.current) {
-          window.clearTimeout(seekTimeoutRef.current);
-          seekTimeoutRef.current = null;
-        }
-      };
-      video.addEventListener('seeked', onSeeked);
-      return () => {
-        video.removeEventListener('seeked', onSeeked);
-      };
     }
   }, []);
 
-  // Passive scroll & resize listener to track progress across hero container
+  // Passive scroll & resize listener to track progress across container
   useEffect(() => {
     const calculateProgress = () => {
       const container = containerRef.current;
@@ -92,22 +80,18 @@ export function useHeroScrollVideo({
     };
   }, []);
 
-  // RequestAnimationFrame loop with LERP for ultra-smooth forward & backward scrubbing
+  // RequestAnimationFrame loop with LERP for ultra-smooth 60fps scroll scrubbing
   useEffect(() => {
-    const video = videoRef.current;
-    if (video) {
-      video.pause();
-    }
-
     let lastProgressReportTime = 0;
+    let lastSeekTimestamp = 0;
 
     const tick = (timestamp: number) => {
       const target = targetProgressRef.current;
       const current = currentProgressRef.current;
       const diff = target - current;
 
-      // Smooth interpolation towards target (forward or backward)
-      if (Math.abs(diff) > 0.0005) {
+      // Smooth interpolation towards target
+      if (Math.abs(diff) > 0.0003) {
         currentProgressRef.current += diff * smoothing;
       } else {
         currentProgressRef.current = target;
@@ -115,37 +99,34 @@ export function useHeroScrollVideo({
 
       const activeProgress = currentProgressRef.current;
 
-      // Throttled state update for external components
-      if (timestamp - lastProgressReportTime > 25) {
+      // Throttled state update for React components (~60fps)
+      if (timestamp - lastProgressReportTime > 16) {
         setScrollProgress(activeProgress);
         lastProgressReportTime = timestamp;
       }
 
+      // Safety watchdog: reset seeking flag if browser didn't emit 'seeked' within 60ms
+      if (isSeekingRef.current && timestamp - lastSeekTimestamp > 60) {
+        isSeekingRef.current = false;
+      }
+
+      // Scroll-driven video seek: strictly proportional to scroll, zero autoplay
       const vid = videoRef.current;
-      if (vid) {
-        // Full duration range: native video.duration or 8.0s
-        const duration = (vid.duration && !isNaN(vid.duration) && vid.duration > 0) ? vid.duration : 8.0;
-        const targetTime = activeProgress * duration;
+      if (vid && vid.readyState >= 2) {
+        const duration = vid.duration && !isNaN(vid.duration) && vid.duration > 0 ? vid.duration : 8.0;
+        const targetTime = Math.min(Math.max(activeProgress * duration, 0.01), duration - 0.05);
         const timeDiff = Math.abs(vid.currentTime - targetTime);
 
-        // Seek frame-by-frame when decoder is ready and diff is > 20ms
-        if (!isSeekingRef.current && timeDiff > 0.02) {
+        // Seek frame-by-frame when difference is > 30ms and browser decoder is not busy
+        if (timeDiff > 0.03 && !vid.seeking && !isSeekingRef.current && (timestamp - lastSeekTimestamp > 32)) {
           isSeekingRef.current = true;
-          const clampedTime = Math.min(Math.max(targetTime, 0), Math.max(duration - 0.02, 0.05));
-          
-          if ('fastSeek' in vid && typeof (vid as any).fastSeek === 'function') {
-            (vid as any).fastSeek(clampedTime);
-          } else {
-            vid.currentTime = clampedTime;
-          }
+          lastSeekTimestamp = timestamp;
 
-          // Safety timeout in case browser skips 'seeked' event
-          if (seekTimeoutRef.current) {
-            window.clearTimeout(seekTimeoutRef.current);
+          if ('fastSeek' in vid && typeof (vid as any).fastSeek === 'function') {
+            (vid as any).fastSeek(targetTime);
+          } else {
+            vid.currentTime = targetTime;
           }
-          seekTimeoutRef.current = window.setTimeout(() => {
-            isSeekingRef.current = false;
-          }, 35);
         }
       }
 
@@ -157,9 +138,6 @@ export function useHeroScrollVideo({
     return () => {
       if (rafIdRef.current) {
         cancelAnimationFrame(rafIdRef.current);
-      }
-      if (seekTimeoutRef.current) {
-        window.clearTimeout(seekTimeoutRef.current);
       }
     };
   }, [smoothing]);
