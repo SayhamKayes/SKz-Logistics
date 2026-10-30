@@ -1,16 +1,21 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { SainLogo } from '../assets/Logo';
 
 /**
- * Preloader component displaying the full brand logo motion video
- * centered on screen with exact 200px width and automatic aspect-ratio height.
- *
- * Configured to play the full 10-second animation at ~2.25x speed (completing in ~4.4s)
- * so the user experiences the complete motion without the site appearing early,
- * followed by a silky smooth dissolve transition.
+ * Preloader component with Hybrid Ambient Mode:
+ * - Plays brand motion video smoothly with hardware acceleration
+ * - Optimized for iOS Safari / WebKit: safe playbackRate, playsInline, webkit-playsinline
+ * - Hybrid ambient fallback: if iOS low-power mode or Safari restricts autoplay or stalls,
+ *   smoothly presents an elegant glowing brand logo with shimmer
+ * - Guaranteed non-blocking: auto fades out smoothly after completion or max safety timer
+ * - Tap to dismiss support for instant access
  */
 export const Preloader: React.FC = () => {
   const [isVisible, setIsVisible] = useState(true);
   const [isFadingOut, setIsFadingOut] = useState(false);
+  const [videoStarted, setVideoStarted] = useState(false);
+  const [showAmbientFallback, setShowAmbientFallback] = useState(false);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const hasFinishedRef = useRef(false);
 
@@ -20,60 +25,93 @@ export const Preloader: React.FC = () => {
 
     setIsFadingOut(true);
 
-    // Give 800ms for the smooth fade-out transition to complete before unmounting
+    // 700ms smooth dissolve transition before unmounting
     setTimeout(() => {
       setIsVisible(false);
       document.body.style.overflow = '';
-    }, 800);
+    }, 700);
   }, []);
 
   useEffect(() => {
-    // Lock scrolling so user cannot scroll the page behind the preloader
+    // Lock scrolling while preloader is active
     document.body.style.overflow = 'hidden';
 
     const video = videoRef.current;
     if (video) {
       video.muted = true;
       video.defaultMuted = true;
-      // 2.25x playback rate plays the full 10s animation in ~4.4 seconds
-      video.playbackRate = 2.25;
+      video.playsInline = true;
+      video.setAttribute('playsinline', 'true');
+      video.setAttribute('webkit-playsinline', 'true');
+      video.setAttribute('x-webkit-airplay', 'deny');
 
+      // Attempt autoplay
       const playPromise = video.play();
       if (playPromise !== undefined) {
-        playPromise.catch(() => {
-          // Fallback if browser requires user gesture
-        });
+        playPromise
+          .then(() => {
+            // Video started playing successfully
+          })
+          .catch(() => {
+            // Safari/iOS autoplay blocked (e.g. low power mode) -> fallback immediately to ambient mode
+            setShowAmbientFallback(true);
+          });
       }
     }
 
-    // Safety fallback timer: guarantee fade-out between 4.4s and 4.8s
-    // even if video buffering or onEnded event is delayed
+    // iOS Safari Stall Detector:
+    // If after 600ms video hasn't progressed, activate ambient mode
+    const stallDetector = setTimeout(() => {
+      if (video && (video.paused || video.currentTime === 0)) {
+        setShowAmbientFallback(true);
+      }
+    }, 600);
+
+    // Safety fallback timer: guarantee fade-out smoothly after 3.8s max
     const safetyTimer = setTimeout(() => {
       startFadeOut();
-    }, 4600);
+    }, 3800);
 
     return () => {
+      clearTimeout(stallDetector);
       clearTimeout(safetyTimer);
       document.body.style.overflow = '';
     };
   }, [startFadeOut]);
 
-  const handleLoadedMetadata = () => {
-    if (videoRef.current) {
-      videoRef.current.playbackRate = 2.25;
+  const handleTimeUpdate = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.currentTime > 0.05 && !videoStarted) {
+      setVideoStarted(true);
+    }
+
+    // If near end (e.g. within 0.3s of duration), trigger fade out
+    if (video.duration && video.currentTime >= video.duration - 0.3) {
+      startFadeOut();
     }
   };
 
-  const handleCanPlay = () => {
-    if (videoRef.current) {
-      videoRef.current.playbackRate = 2.25;
-      videoRef.current.play().catch(() => { });
+  const handlePlaying = () => {
+    const video = videoRef.current;
+    if (video) {
+      setVideoStarted(true);
+      try {
+        // Safe standard 2x rate on Apple WebKit / iOS
+        video.playbackRate = 2.0;
+      } catch {
+        // Fallback silently if browser restricts rate change
+      }
     }
   };
 
   const handleVideoEnded = () => {
-    // When the full motion animation completes, fade out smoothly
     startFadeOut();
+  };
+
+  const handleVideoError = () => {
+    setShowAmbientFallback(true);
   };
 
   if (!isVisible) {
@@ -83,12 +121,20 @@ export const Preloader: React.FC = () => {
   return (
     <div
       id="sain-site-preloader"
-      className={`fixed inset-0 z-[9999999] bg-black flex items-center justify-center transition-opacity duration-800 ease-in-out select-none will-change-opacity ${isFadingOut ? 'opacity-0 pointer-events-none' : 'opacity-100'
+      onClick={startFadeOut}
+      className={`fixed inset-0 z-[9999999] bg-black flex flex-col items-center justify-center transition-opacity duration-700 ease-out select-none cursor-pointer will-change-opacity transform-gpu ${isFadingOut ? 'opacity-0 pointer-events-none' : 'opacity-100'
         }`}
+      style={{
+        backgroundColor: '#000000',
+        WebkitBackfaceVisibility: 'hidden',
+        WebkitTransform: 'translateZ(0)',
+      }}
       aria-label="Loading SAIN Logistics..."
       role="status"
     >
-      <div className="w-[400px] flex items-center justify-center transform-gpu">
+      {/* Main Brand Stage (Pure seamless black) */}
+      <div className="relative w-full max-w-[340px] sm:max-w-[420px] px-6 flex flex-col items-center justify-center transform-gpu">
+        {/* Brand Video Player */}
         <video
           ref={videoRef}
           src="/videos/pre-loader-logo.mp4"
@@ -96,11 +142,26 @@ export const Preloader: React.FC = () => {
           muted
           playsInline
           preload="auto"
-          onLoadedMetadata={handleLoadedMetadata}
-          onCanPlay={handleCanPlay}
+          onPlaying={handlePlaying}
+          onTimeUpdate={handleTimeUpdate}
           onEnded={handleVideoEnded}
-          className="w-[400px] h-auto object-contain pointer-events-none select-none block"
+          onError={handleVideoError}
+          className={`w-full h-auto object-contain pointer-events-none select-none transition-opacity duration-300 ${videoStarted && !showAmbientFallback ? 'opacity-100' : 'opacity-0'
+            }`}
+          style={{ WebkitTransform: 'translateZ(0)', backgroundColor: '#000000' }}
         />
+
+        {/* Hybrid Ambient Mode Fallback Layer (shows only if video is delayed/blocked by iOS) */}
+        {(!videoStarted || showAmbientFallback) && (
+          <div
+            className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-300 ${showAmbientFallback || !videoStarted ? 'opacity-100' : 'opacity-0 pointer-events-none'
+              }`}
+          >
+            <div className="transform scale-110 sm:scale-125">
+              <SainLogo variant="white" />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
