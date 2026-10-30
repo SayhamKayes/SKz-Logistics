@@ -188,7 +188,7 @@ export const HomeContentEditor: React.FC = () => {
       setSaveModal({
         isOpen: true,
         title: 'Hero Changes Saved!',
-        message: 'Hero section and messenger configuration are saved to Central Neon Database and live across all devices.',
+        message: 'Hero section and messenger configuration are saved to Central Database and live across all devices.',
         type: 'success',
       });
     } else {
