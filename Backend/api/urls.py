@@ -8,10 +8,16 @@ from .views import (
     get_all_site_configs,
     site_config_detail,
     upload_media,
+    setup_database,
+    admin_login,
+    change_password,
 )
 
 urlpatterns = [
     path('health/', health_check, name='api-health'),
+    path('setup-database/', setup_database, name='api-setup-database'),
+    path('auth/login/', admin_login, name='auth-login'),
+    path('auth/change-password/', change_password, name='auth-change-password'),
     path('contact/send-email/', send_contact_email, name='contact-send-email'),
     path('contact/test-smtp/', test_smtp_connection, name='contact-test-smtp'),
     path('auth/forgot-password/', forgot_password, name='auth-forgot-password'),
