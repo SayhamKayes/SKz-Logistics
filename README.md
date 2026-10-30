@@ -93,16 +93,23 @@ flowchart TD
 
 ## ⚡ Key Features
 
-### 1. 🔍 Live Consignment Tracking Engine
-- **Unified Consignment Lookup**: Instant query by Consignment Code, Reference Number, or Air Waybill number (`SAINEX067638406`, `12345`, `SAIN-78492-BD`, `SAIN-SEA-99120`).
+### 1. 🔍 Live Consignment Tracking Engine & Lifecycle Progression
+- **Unified Consignment Lookup**: Instant query by Consignment Code, Reference Number, or Air Waybill number (`SAINEX067638406`, `SAINEX74389960`, `12345`, `SAIN-78492-BD`, `SAIN-SEA-99120`).
 - **Transit Corridor Visualization**: Visual progress connecting Origin Hubs (e.g. `[CAN] Guangzhou, China`) to Destination Hubs (e.g. `[DAC] Dhaka, Bangladesh`).
-- **Dynamic Milestone Timeline**: Clear progression markers for Completed, In-Flight, and Pending checkpoints with audit timestamps and geographic tags.
+- **Dynamic Milestone Timeline with Prerequisite Synthesis**:
+  - Automatically ensures all preceding lifecycle stages (`Pending` → `Received` → `In Transit`) are displayed sequentially when a shipment advances to `At Bangladesh warehouse` or beyond.
+  - Generates realistic, chronologically ordered audit timestamps and geographic tags so customer tracking always displays a complete 3+ step journey.
 - **Cargo Specification Breakdown**: Detailed display of Gross Weight, Carton Count, Volume (CBM), Payment Mode, HS Codes, and Dimensions.
 - **Statutory Customs Compliance**: Live assessment badge under the **Bangladesh Customs Act 2023**, trade terms (DAP/CFR), and assessment stations.
 
-### 2. 🛠️ Enterprise Admin Portal (`/sain-sakib`)
-- **Complete Consignment Lifecycle Management**: Add, modify, publish, archive, or trash consignments.
+### 2. 🛠️ Enterprise Admin Operations Portal (`/admin` / `/sain-sakib`)
+- **Full Consignment Lifecycle Management**: Add, modify, publish, archive, or trash consignments with live central database persistence.
 - **`+ Add New Bill` Generator**: Generates an auto-incremented, collision-checked unique consignment code starting with **`SAINEX` + 8 digits** (e.g., `SAINEX58291402`), resetting all fields to a clean state ready for entry.
+- **Recycle Bin (Trash) & Instant Deletion Confirmation**:
+  - **Move to Trash**: Safely relocates any consignment into the Recycle Bin with confirmation.
+  - **Restore / Recycle**: Instant single-click restoration of any trashed bill back to active tracking.
+  - **Delete Permanently**: Modal dialog (`ConfirmModal`) mounted directly inside the Trash view with immediate popup ("Yes, Delete Permanently" & "Cancel"), executing atomic purge across local cache and central database.
+  - **Empty Recycle Bin**: Bulk deletion action to purge all trashed consignments simultaneously.
 - **10-Checkpoint Milestone Pagination**: Shipment history checkpoints table paginated to **10 records per page** with interactive `[Prev] [1] [2] ... [Next]` navigation controls.
 - **Standardized Package Piece Types**:
   - `-- Select Type --`
@@ -119,28 +126,27 @@ flowchart TD
   | `On Hold by Customs` | Orange Pulse | Inspection hold at customs house |
   | `Out for delivery` | Amber Pulse | Dispatched on last-mile delivery vehicle |
   | `In Transit` | Blue | Moving across international corridor |
-  | `Enroute` | Blue | In flight or ocean voyage underway |
+  | `En Route` | Blue | In flight or ocean voyage underway |
   | `Cancelled` | Red / Rose | Booking terminated |
   | `Delivered` | Emerald Green | Successfully delivered to consignee |
   | `Returned` | Red / Rose | Returned to hub or shipper |
   | `At Bangladesh warehouse` | Teal / Cyan | Staged at local Dhaka warehouse |
 
-### 3. 🖨️ Printable Air Waybill (AWB) & Invoice Generator
-- Dedicated modal rendering an official **International Air Waybill (HAWB)** conforming to IATA layout principles.
-- Code 128 barcode simulation, carrier stamps, signature zones, and billing itemization.
-- Integrated print stylesheet (`@media print`) stripping out browser chrome, buttons, and navigation for crisp, physical printing.
+### 3. ⏰ Bangladesh Standard Time (BST UTC+6) & Time Formatting
+- **Native BST Persistence**: Configured Django with `USE_TZ = False` to store raw Bangladesh Standard Time directly in MySQL `DATETIME` columns, eliminating 6-hour timestamp discrepancies.
+- **Clean 12-Hour Time Format**: Integrated `formatToBDTime()` helper ensuring consistent 12-hour timestamps (e.g., `01:46 PM`, `08:30 PM`) across admin inputs, milestones, and customer tracking views.
 
-### 4. 📝 Integrated Content Management System (CMS)
-- **Home Content Editor**: Hero banners, key metrics counters, promotional notices.
-- **About Us Editor**: Company profile, operational history, core leadership values.
-- **Services Catalog Editor**: Air freight, ocean freight, warehousing, and customs clearance cards with pricing matrices.
-- **Branch Directory Editor**: Guangzhou Hub, Dhaka Corporate Office, Chittagong Port Liaison, phone numbers, and operational hours.
-- **Admin Profile Editor**: Secure credential manager for modifying administrative login parameters.
+### 4. 🖨️ Real-Time Dynamic Air Waybill (AWB) Generator
+- **Live Form Synchronization**: `WaybillPrintModal` dynamically mirrors all current form inputs (shipper, consignee, package breakdown, total freight, CRN, notes) in real time without requiring prior saving.
+- **Official IATA Layout**: Conforms to standard International Air Waybill layout with Code 128 barcode simulation, carrier stamps, signature zones, and billing itemization.
+- **Print Optimization**: High-fidelity `@media print` CSS stripping browser headers and footers for clean physical label and invoice printing.
 
-### 5. 🔄 Dual-Tier Resilient Data Synchronization
-- **Primary Tier**: Django REST Framework backend with SQLite/PostgreSQL persistence.
-- **Secondary Tier**: Browser `LocalStorage` caching with optimistic UI updates.
-- **Real-Time Broadcast**: `window.dispatchEvent(new CustomEvent('sain_consignment_updated'))` propagates updates across active browser tabs and modal views without page refresh.
+### 5. 🔄 Central Database Multi-Device Sync & Unicode Sanitization
+- **Multi-Device & Cross-Browser Synchronization**: Full bidirectional synchronization between Django REST backend (hosted on cPanel MySQL) and React clients.
+- **Unicode Currency Sanitization**: Automated conversion of Bengali Taka currency symbols (`৳` / `\u09F3`) to `BDT` across both frontend context and backend DRF serializers/views, eliminating MySQL `1366 Incorrect string value` errors.
+- **Connection Encoding**: Configured MySQL connection with `SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci` for safe multilingual text storage.
+- **Dual-Tier Resilient Caching**: Background `LocalStorage` cache fallback with optimistic UI rendering.
+- **Real-Time Event Broadcast**: `window.dispatchEvent(new CustomEvent('sain_consignment_updated'))` updates all open tabs and views instantly.
 
 ---
 
@@ -368,6 +374,30 @@ The platform includes built-in compliance tracking with the **Bangladesh Customs
 - **Statutory Framework**: Formulated according to National Board of Revenue (NBR) digital customs guidelines.
 - **Incoterms Support**: Full documentation for `DAP` (Delivered at Place), `CFR` (Cost & Freight), and `FOB` (Free on Board).
 - **Customs Stations**: Pre-linked with Hazrat Shahjalal International Airport (HSIA), Chittagong Sea Port, and Kamalapur ICD.
+
+---
+
+## 📦 cPanel Production Deployment Guide
+
+The repository includes an automated packaging pipeline producing 100% Linux/Unix-compatible ZIP archives with forward slashes for direct cPanel deployment.
+
+### 1. Build Production Packages
+Run the automated build script from the project root:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build_deploy_zip.ps1
+```
+This builds the optimized React distribution and generates two clean deployment archives in `deploy_cpanel/`:
+- **`public_html_frontend.zip`**: Contains the compiled Vite SPA, static assets, and `.htaccess` for Apache rewrite routing.
+- **`sain_backend.zip`**: Contains the Django REST backend configured with `passenger_wsgi.py` and MySQL database connection.
+
+### 2. Upload to cPanel Server
+1. **Frontend Deployment**:
+   - In cPanel File Manager, upload `public_html_frontend.zip` to `/home/saininte/public_html/`.
+   - Extract files directly into `public_html/`.
+2. **Backend Deployment**:
+   - Upload `sain_backend.zip` to `/home/saininte/sain_backend/`.
+   - Extract files into `sain_backend/`.
+   - Navigate to cPanel **Setup Python App**, select the application, and click **Restart Application**.
 
 ---
 
