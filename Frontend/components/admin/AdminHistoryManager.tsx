@@ -84,17 +84,18 @@ export const AdminHistoryManager: React.FC = () => {
 
   // Filtered and searched records
   const filteredRecords = useMemo(() => {
-    return historyList.filter((item) => {
+    return (historyList || []).filter((item) => {
+      if (!item) return false;
       const matchesModule = selectedModule === 'all' || item.module === selectedModule;
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
         !q ||
-        item.entityId.toLowerCase().includes(q) ||
-        item.description.toLowerCase().includes(q) ||
-        item.adminUser.toLowerCase().includes(q) ||
-        item.actionLabel.toLowerCase().includes(q) ||
-        item.moduleLabel.toLowerCase().includes(q) ||
-        item.formatted.toLowerCase().includes(q);
+        (item.entityId || '').toLowerCase().includes(q) ||
+        (item.description || '').toLowerCase().includes(q) ||
+        (item.adminUser || '').toLowerCase().includes(q) ||
+        (item.actionLabel || '').toLowerCase().includes(q) ||
+        (item.moduleLabel || '').toLowerCase().includes(q) ||
+        (item.formatted || '').toLowerCase().includes(q);
 
       return matchesModule && matchesSearch;
     });
