@@ -16,7 +16,7 @@ export const WaybillPrintModal: React.FC<WaybillPrintModalProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<'3-copy-waybill' | 'consignment-receipt'>('3-copy-waybill');
 
-  if (!isOpen) return null;
+  if (!isOpen || !consignment) return null;
 
   const shipper = consignment.shipper || {
     name: 'SAIN',
@@ -32,27 +32,6 @@ export const WaybillPrintModal: React.FC<WaybillPrintModalProps> = ({
     email: 'ocuna123@gmail.com',
   };
 
-  const details = consignment.shipmentDetails || {
-    typeOfShipment: consignment.serviceType || 'Air Freight',
-    weightText: consignment.cargoDetails?.weight || 'around 1500g',
-    packagesCount: String(consignment.cargoDetails?.pieces || 7),
-    product: consignment.cargoDetails?.description || 'Keychain, Doll, Acrylic sheet',
-    paymentMode: 'CASH',
-    carrier: consignment.carrier || 'SAINEX',
-    departureTimeStr: '18:52 pm',
-    destination: consignment.destination?.country || 'Bangladesh',
-    pickupTimeStr: '10:00 am',
-    courier: 'SAIN INTERNATIONAL LOGISTICS',
-    mode: 'Air Freight',
-    quantity: '7 Box',
-    totalFreight: '৳ 12,500',
-    carrierReferenceNo: consignment.referenceNo || 'CRN-884920',
-    origin: consignment.origin?.country || 'China',
-    pickupDate: '2026-08-01',
-    expectedDeliveryDate: '2026-08-12',
-    comments: 'Total 7 store product.',
-  };
-
   const packages = consignment.packagesData && consignment.packagesData.length > 0
     ? consignment.packagesData
     : [
@@ -64,6 +43,64 @@ export const WaybillPrintModal: React.FC<WaybillPrintModalProps> = ({
         { id: '6', qty: 1, pieceType: 'Carton', description: '66924', lengthCm: 0, widthCm: 0, heightCm: 0, weightG: 0 },
         { id: '7', qty: 1, pieceType: 'Carton', description: '60831', lengthCm: 0, widthCm: 0, heightCm: 0, weightG: 0 },
       ];
+
+  const calculatedActualWeight = packages.reduce((acc, p) => acc + (Number(p.qty) || 1) * (Number(p.weightG) || 0), 0);
+  let fallbackWeightG = 0;
+  if (consignment.chargeableWeightKg) {
+    fallbackWeightG = Number(consignment.chargeableWeightKg) * 1000;
+  } else if (consignment.cargoDetails?.weight) {
+    const match = consignment.cargoDetails.weight.match(/([\d.]+)/);
+    if (match) {
+      const val = parseFloat(match[1]);
+      fallbackWeightG = consignment.cargoDetails.weight.toLowerCase().includes('kg') ? val * 1000 : val;
+    }
+  }
+  const totalActualWeightG = calculatedActualWeight > 0 ? calculatedActualWeight : fallbackWeightG;
+
+  const totalVolumeCuM = packages.reduce((sum, p) => {
+    const vol = ((Number(p.lengthCm) || 0) * (Number(p.widthCm) || 0) * (Number(p.heightCm) || 0)) / 1000000;
+    return sum + (Number(p.qty) || 1) * vol;
+  }, 0);
+
+  const totalVolumetricWeightG = packages.reduce((sum, p) => {
+    const volWeightKg = ((Number(p.lengthCm) || 0) * (Number(p.widthCm) || 0) * (Number(p.heightCm) || 0)) / 5000;
+    return sum + (Number(p.qty) || 1) * volWeightKg * 1000;
+  }, 0);
+
+  const totalPiecesCount = packages.reduce((sum, p) => sum + (Number(p.qty) || 1), 0);
+
+  const rawDetails = consignment.shipmentDetails;
+  const details = {
+    typeOfShipment: rawDetails?.typeOfShipment || consignment.serviceType || 'Air Freight',
+    weightText:
+      rawDetails?.weightText ||
+      (totalActualWeightG > 0
+        ? totalActualWeightG >= 1000
+          ? `${(totalActualWeightG / 1000).toFixed(2)} kg (${totalActualWeightG.toFixed(0)}g)`
+          : `${totalActualWeightG.toFixed(0)}g`
+        : consignment.cargoDetails?.weight || 'around 1500g'),
+    packagesCount:
+      rawDetails?.packagesCount ||
+      String(totalPiecesCount || consignment.cargoDetails?.pieces || packages.length || 7),
+    product: rawDetails?.product || consignment.cargoDetails?.description || 'Keychain, Doll, Acrylic sheet',
+    paymentMode: rawDetails?.paymentMode || 'CASH',
+    carrier: rawDetails?.carrier || consignment.carrier || 'SAINEX',
+    departureTimeStr: rawDetails?.departureTimeStr || '18:52 pm',
+    destination: rawDetails?.destination || consignment.destination?.country || 'Bangladesh',
+    pickupTimeStr: rawDetails?.pickupTimeStr || '10:00 am',
+    courier: rawDetails?.courier || 'SAIN INTERNATIONAL LOGISTICS',
+    mode: rawDetails?.mode || 'Air Freight',
+    quantity:
+      rawDetails?.quantity ||
+      `${totalPiecesCount || packages.length} ${packages[0]?.pieceType || 'Box'}`,
+    totalFreight: (rawDetails?.totalFreight || 'BDT 12,500').replace(/৳/g, 'BDT ').trim(),
+
+    carrierReferenceNo: rawDetails?.carrierReferenceNo || consignment.referenceNo || 'CRN-884920',
+    origin: rawDetails?.origin || consignment.origin?.country || 'China',
+    pickupDate: rawDetails?.pickupDate || '2026-08-01',
+    expectedDeliveryDate: rawDetails?.expectedDeliveryDate || '2026-08-12',
+    comments: rawDetails?.comments || 'Total store products.',
+  };
 
   const copies = [
     { title: 'Accounts Copy', subtitle: 'Office & Audit Record' },
@@ -427,9 +464,9 @@ export const WaybillPrintModal: React.FC<WaybillPrintModalProps> = ({
 
                 {/* Volumetric & Actual Weight Summary Bar */}
                 <div className="flex flex-wrap items-center justify-between text-[11px] font-bold text-slate-800 pt-2 border-t border-slate-300">
-                  <span>Total Volumetric Weight: 0.00g.</span>
-                  <span>Total Volume: 0.00cu. m.</span>
-                  <span>Total Actual Weight: 0.00g.</span>
+                  <span>Total Volumetric Weight: {totalVolumetricWeightG.toFixed(2)}g.</span>
+                  <span>Total Volume: {totalVolumeCuM.toFixed(4)}cu. m.</span>
+                  <span>Total Actual Weight: {totalActualWeightG.toFixed(2)}g.</span>
                 </div>
               </div>
 
