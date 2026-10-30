@@ -48,7 +48,6 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const [showPasswords, setShowPasswords] = useState(false);
-  const [storedPassword, setStoredPassword] = useState('admin123');
 
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>('Today at 22:15 BST');
@@ -105,7 +104,6 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
         if (remote.username) setUsername(remote.username);
         if (remote.email) setEmail(remote.email);
         if (remote.phone) setPhone(remote.phone);
-        if (remote.password) setStoredPassword(remote.password);
         if (remote.lastUpdated) setLastUpdated(remote.lastUpdated);
       }
     });
@@ -119,7 +117,6 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
           if (parsed.username) setUsername(parsed.username);
           if (parsed.email) setEmail(parsed.email);
           if (parsed.phone) setPhone(parsed.phone);
-          if (parsed.password) setStoredPassword(parsed.password);
           if (parsed.lastUpdated) setLastUpdated(parsed.lastUpdated);
         }
       } catch {
@@ -141,13 +138,12 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
     e.preventDefault();
     setMessage(null);
 
-    // Validate password change if attempted
-    let passwordToSave = storedPassword;
+    // Validate and process secure password change if attempted
     if (newPassword.trim() || confirmPassword.trim() || currentPassword.trim()) {
-      if (currentPassword !== storedPassword && currentPassword !== 'admin123') {
+      if (!currentPassword.trim()) {
         setMessage({
           type: 'error',
-          text: 'Current password does not match your existing password.',
+          text: 'Please enter your current password.',
         });
         return;
       }
@@ -168,7 +164,36 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
         return;
       }
 
-      passwordToSave = newPassword;
+      try {
+        const baseUrl = getApiBaseUrl();
+        const pwRes = await fetch(`${baseUrl}/api/v1/auth/change-password/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({
+            username: username.trim(),
+            current_password: currentPassword.trim(),
+            new_password: newPassword.trim(),
+          }),
+        });
+
+        const pwData = await pwRes.json().catch(() => ({}));
+        if (!pwRes.ok || !pwData.success) {
+          setMessage({
+            type: 'error',
+            text: pwData.error || 'Failed to update password. Current password may be incorrect.',
+          });
+          return;
+        }
+      } catch (err: any) {
+        setMessage({
+          type: 'error',
+          text: 'Server connection failed while updating password.',
+        });
+        return;
+      }
     }
 
     const timestamp = new Date().toLocaleString('en-US', {
@@ -176,17 +201,17 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
       timeStyle: 'short',
     });
 
+    // Sanitized profile without plaintext password
     const updatedProfile = {
       name: name.trim(),
       username: username.trim(),
       email: email.trim(),
       phone: phone.trim(),
-      password: passwordToSave,
       lastUpdated: timestamp,
     };
 
     localStorage.setItem('sain_admin_profile', JSON.stringify(updatedProfile));
-    setStoredPassword(passwordToSave);
+    localStorage.removeItem('sain_admin_password');
     setLastUpdated(timestamp);
 
     // Clear password inputs
@@ -199,7 +224,7 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
     if (res.success) {
       setMessage({
         type: 'success',
-        text: 'Profile details and credentials saved to Central Neon Database! New credentials active across all devices.',
+        text: 'Profile details and credentials saved to Central Database! New credentials active across all devices.',
       });
     } else {
       setMessage({
@@ -473,7 +498,7 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
               <span>Central Database & Backend Connectivity</span>
             </h4>
             <p className="text-xs text-slate-500 mt-0.5">
-              Monitor live Neon PostgreSQL database health, ping latency, and toggle backend environment.
+              Monitor live Central MySQL database health, ping latency, and toggle backend environment.
             </p>
           </div>
 
@@ -511,7 +536,7 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
               </div>
               <div className="min-w-0">
                 <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
-                  <span>{serverHealth.isOnline ? 'Neon PostgreSQL Connected' : 'Database Offline'}</span>
+                  <span>{serverHealth.isOnline ? 'Central Database Connected' : 'Database Offline'}</span>
                   {serverHealth.isOnline && (
                     <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 font-mono font-bold rounded-full">
                       {serverHealth.latencyMs}ms
@@ -558,10 +583,11 @@ export const AdminProfileEditor: React.FC<AdminProfileEditorProps> = ({ onProfil
                     ? 'bg-white text-[#1a6c7a] shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
-                title="Connect to Render Backend & Neon PostgreSQL Cloud Database"
+                title="Connect to cPanel Production Backend & Central Database"
               >
-                <span>Cloud (Neon DB)</span>
+                <span>Live Production</span>
               </button>
+
               <button
                 type="button"
                 onClick={() => handleSwitchBackendEnv('local')}
