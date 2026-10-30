@@ -20,3 +20,5 @@ venv/
 env/
 db.sqlite3
 
+# cPanel build distribution archives
+deploy_cpanel/
