@@ -223,7 +223,7 @@ export const FooterContentEditor: React.FC = () => {
       setSaveModal({
         isOpen: true,
         title: 'Footer Changes Saved!',
-        message: 'Footer navigation, links, and contact information are saved to Central Neon Database and live across all devices.',
+        message: 'Footer navigation, links, and contact information are saved to Central Database and live across all devices.',
         type: 'success',
       });
     } else {
