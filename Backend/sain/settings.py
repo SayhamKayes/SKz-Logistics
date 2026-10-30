@@ -1,19 +1,18 @@
 """
 Django settings for SAIN International Logistics project.
-Supports dynamic switching between PostgreSQL, Neon.tech, and Supabase.
+Configured for dedicated MySQL (cPanel / phpMyAdmin production and local).
 """
 
 from pathlib import Path
 import os
 from dotenv import load_dotenv
-import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-sain-logistics-2026-secret-key-bangladesh')
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '*').split(',') if h.strip()]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -39,6 +38,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -69,49 +69,43 @@ WSGI_APPLICATION = 'sain.wsgi.application'
 ASGI_APPLICATION = 'sain.asgi.application'
 
 # ==============================================================================
-# DATABASE CONFIGURATION & SWITCHER (PostgreSQL, Neon.tech, Supabase)
+# DATABASE CONFIGURATION: EXCLUSIVE DEDICATED MYSQL (cPanel & Local)
 # ==============================================================================
-DB_PROVIDER = os.getenv('DB_PROVIDER', 'sqlite').lower()
+# Standard MySQL Instance (cPanel / phpMyAdmin)
+MYSQL_DB = os.getenv('MYSQL_DB', 'saininte_logistics')
+MYSQL_USER = os.getenv('MYSQL_USER', 'saininte_dbuser')
+MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', '')
+MYSQL_HOST = os.getenv('MYSQL_HOST', 'localhost')
+MYSQL_PORT = os.getenv('MYSQL_PORT', '3306')
 
-if DB_PROVIDER == 'neon' and os.getenv('NEON_DATABASE_URL'):
-    # Neon Tech Serverless PostgreSQL
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=os.getenv('NEON_DATABASE_URL'),
-            conn_max_age=600,
-            conn_health_checks=True,
-            ssl_require=True,
-        )
-    }
-elif DB_PROVIDER == 'supabase' and os.getenv('SUPABASE_DATABASE_URL'):
-    # Supabase PostgreSQL Pooler
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=os.getenv('SUPABASE_DATABASE_URL'),
-            conn_max_age=600,
-            ssl_require=True,
-        )
-    }
-elif DB_PROVIDER == 'postgres':
-    # Standard PostgreSQL Instance
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.getenv('POSTGRES_DB', 'sain_db'),
-            'USER': os.getenv('POSTGRES_USER', 'sain_user'),
-            'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'sain_secure_password'),
-            'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
-            'PORT': os.getenv('POSTGRES_PORT', '5432'),
-        }
-    }
-else:
-    # Local fallback for instant local run
+# In local dev environment without a live local MySQL daemon, fall back gracefully to sqlite3
+# On cPanel production, .env.cpanel provides the live MySQL credentials so it connects to MySQL.
+use_sqlite = os.getenv('USE_SQLITE', 'False') == 'True' or not MYSQL_PASSWORD or MYSQL_PASSWORD == 'your_mysql_password_here'
+
+if use_sqlite:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': MYSQL_DB,
+            'USER': MYSQL_USER,
+            'PASSWORD': MYSQL_PASSWORD,
+            'HOST': MYSQL_HOST,
+            'PORT': MYSQL_PORT,
+            'OPTIONS': {
+                'charset': 'utf8mb4',
+                'init_command': "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci, sql_mode='STRICT_TRANS_TABLES'",
+
+            }
+        }
+    }
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -123,12 +117,21 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Asia/Dhaka'
 USE_I18N = True
-USE_TZ = True
+USE_TZ = False  # Store datetimes directly in Bangladesh Standard Time (BST) in MySQL
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-MEDIA_URL = 'media/'
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
+
+MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -143,13 +146,33 @@ REST_FRAMEWORK = {
 }
 
 # CORS Configuration
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', 'True') == 'True'
+cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS', '')
+if cors_origins_env:
+    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_env.split(',') if origin.strip()]
+else:
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://saininternationallogistics.com",
+        "https://www.saininternationallogistics.com",
+        "https://new.saininternationallogistics.com",
+    ]
+
+# CSRF Trusted Origins (Mandatory for Django 4+ with custom domains / subdomains)
+csrf_origins_env = os.getenv('CSRF_TRUSTED_ORIGINS', '')
+if csrf_origins_env:
+    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_origins_env.split(',') if origin.strip()]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        "https://saininternationallogistics.com",
+        "https://www.saininternationallogistics.com",
+        "https://new.saininternationallogistics.com",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
 
 # Cloudinary Media Configuration
 CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME', '').strip()
