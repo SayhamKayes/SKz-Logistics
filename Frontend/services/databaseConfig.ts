@@ -44,13 +44,13 @@ export const DEFAULT_DB_CONFIG: DatabaseConnectionConfig = {
     user: 'sain_user',
   },
   djangoApi: {
-    baseUrl: 'https://skzlogisticsbackend.onrender.com',
+    baseUrl: (import.meta as any).env?.VITE_API_BASE_URL || 'https://new.saininternationallogistics.com',
     trackingEndpoint: '/api/v1/couriers/track/',
     ordersEndpoint: '/api/v1/order/',
   },
 };
 
-export const LIVE_BACKEND_URL = 'https://skzlogisticsbackend.onrender.com';
+export const LIVE_BACKEND_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'https://new.saininternationallogistics.com';
 export const LOCAL_BACKEND_URL = 'http://127.0.0.1:8000';
 export const BACKEND_ENV_KEY = 'sain_backend_env_mode'; // 'live' | 'local'
 
@@ -60,7 +60,7 @@ export function getBackendEnv(): 'live' | 'local' {
     if (stored === 'local') return 'local';
     if (stored === 'live') return 'live';
   }
-  return 'live'; // Default to live production Neon DB backend so both localhost and live site use central DB
+  return 'live'; // Default to live production backend
 }
 
 export function setBackendEnv(env: 'live' | 'local'): void {
@@ -77,7 +77,6 @@ export function getApiBaseUrl(): string {
 
     const envMode = getBackendEnv();
     if (envMode === 'local') return LOCAL_BACKEND_URL;
-    return LIVE_BACKEND_URL;
   }
 
   const envVar = (import.meta as any).env?.VITE_API_BASE_URL;
