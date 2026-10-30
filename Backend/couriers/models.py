@@ -48,17 +48,17 @@ class Consignment(models.Model):
 
     # Extended Shipment Details (matching admin panel)
     type_of_shipment = models.CharField(max_length=64, default='Air Freight', blank=True)
-    weight_text = models.CharField(max_length=64, default='around 1500g', blank=True)
-    packages_count = models.CharField(max_length=32, default='7', blank=True)
+    weight_text = models.CharField(max_length=128, default='around 1500g', blank=True)
+    packages_count = models.CharField(max_length=64, default='7', blank=True)
     product = models.CharField(max_length=255, blank=True, default='Keychain, Doll, Acrylic sheet')
     payment_mode = models.CharField(max_length=64, default='CASH', blank=True)
-    departure_time_str = models.CharField(max_length=64, blank=True, default='18:52 pm')
-    pickup_time_str = models.CharField(max_length=64, blank=True, default='')
-    quantity = models.CharField(max_length=64, default='7 Box', blank=True)
-    total_freight = models.CharField(max_length=64, blank=True, default='')
-    carrier_reference_no = models.CharField(max_length=64, blank=True, default='')
-    pickup_date = models.CharField(max_length=64, blank=True, default='')
-    expected_delivery_date = models.CharField(max_length=64, blank=True, default='')
+    departure_time_str = models.CharField(max_length=128, blank=True, default='18:52 pm')
+    pickup_time_str = models.CharField(max_length=128, blank=True, default='')
+    quantity = models.CharField(max_length=128, default='7 Box', blank=True)
+    total_freight = models.CharField(max_length=128, blank=True, default='')
+    carrier_reference_no = models.CharField(max_length=128, blank=True, default='')
+    pickup_date = models.CharField(max_length=128, blank=True, default='')
+    expected_delivery_date = models.CharField(max_length=128, blank=True, default='')
     comments = models.TextField(blank=True, default='Total 7 store product.')
     
     # Packages table data (JSON)
@@ -70,11 +70,11 @@ class Consignment(models.Model):
     client = models.CharField(max_length=128, blank=True, default='')
     agent_name = models.CharField(max_length=128, blank=True, default='')
     employee = models.CharField(max_length=128, blank=True, default='')
-    published_status = models.CharField(max_length=64, default='Published', blank=True)
+    published_status = models.CharField(max_length=128, default='Published', blank=True)
 
     # Consignee
     consignee_name = models.CharField(max_length=128, default='Muhammad Tahin', blank=True)
-    consignee_phone = models.CharField(max_length=32, default='+8801731939325', blank=True)
+    consignee_phone = models.CharField(max_length=64, default='+8801731939325', blank=True)
 
     progress_percentage = models.PositiveIntegerField(default=20)
     estimated_delivery = models.CharField(max_length=128, default='Within 48 hours', blank=True)
@@ -92,10 +92,10 @@ class Milestone(models.Model):
     location = models.CharField(max_length=255)
     description = models.TextField(blank=True, default='')
     status = models.CharField(max_length=64, default='In Transit') # Pending, Received, In Transit, At Bangladesh warehouse, etc.
-    date_str = models.CharField(max_length=32, blank=True, default='')
-    time_str = models.CharField(max_length=32, blank=True, default='')
-    updated_by = models.CharField(max_length=128, blank=True, default='SAIN International Logistics')
-    remarks = models.CharField(max_length=255, blank=True, default='')
+    date_str = models.CharField(max_length=128, blank=True, default='')
+    time_str = models.CharField(max_length=64, blank=True, default='')
+    updated_by = models.CharField(max_length=255, blank=True, default='SAIN International Logistics')
+    remarks = models.TextField(blank=True, default='')
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
