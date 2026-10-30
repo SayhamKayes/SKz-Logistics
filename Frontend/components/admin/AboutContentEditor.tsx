@@ -179,7 +179,7 @@ export const AboutContentEditor: React.FC = () => {
       setSaveModal({
         isOpen: true,
         title: 'About Changes Saved!',
-        message: 'About Us content and values are saved to Central Neon Database and live across all devices.',
+        message: 'About Us content and values are saved to Central Database and live across all devices.',
         type: 'success',
       });
     } else {
