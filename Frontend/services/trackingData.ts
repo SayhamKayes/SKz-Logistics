@@ -177,7 +177,8 @@ export const INITIAL_CONSIGNMENTS: Record<string, Consignment> = {
       courier: 'SAIN INTERNATIONAL LOGISTICS',
       mode: 'Air Freight',
       quantity: '7 Box',
-      totalFreight: '৳ 12,500',
+      totalFreight: 'BDT 12,500',
+
       carrierReferenceNo: 'CRN-884920',
       origin: 'China',
       pickupDate: '2026-08-01',
@@ -194,16 +195,16 @@ export const INITIAL_CONSIGNMENTS: Record<string, Consignment> = {
       { id: 'p7', qty: 1, pieceType: 'Carton', description: '60831', lengthCm: 0, widthCm: 0, heightCm: 0, weightG: 0 },
     ],
     shipmentHistory: [
-      { id: 'sh1', date: '2026-08-11', time: '13:46 pm', location: 'Bangladesh', status: 'At Bangladesh warehouse', updatedBy: 'SAIN International Logistics', remarks: 'Contact via' },
-      { id: 'sh2', date: '2026-08-07', time: '14:00 pm', location: 'China', status: 'In Transit', updatedBy: 'SAIN International Logistics', remarks: 'Contact via' },
-      { id: 'sh3', date: '2026-08-01', time: '19:47 pm', location: 'China', status: 'Received', updatedBy: 'SAIN International Logistics', remarks: 'Contact via' },
+      { id: 'sh1', date: '2026-08-11', time: '01:46 PM', location: 'Bangladesh', status: 'At Bangladesh warehouse', updatedBy: 'SAIN International Logistics', remarks: 'Contact via' },
+      { id: 'sh2', date: '2026-08-07', time: '02:00 PM', location: 'China', status: 'In Transit', updatedBy: 'SAIN International Logistics', remarks: 'Contact via' },
+      { id: 'sh3', date: '2026-08-01', time: '07:47 PM', location: 'China', status: 'Received', updatedBy: 'SAIN International Logistics', remarks: 'Contact via' },
     ],
     adminMetadata: {
       client: '',
       agentName: '',
       employee: '',
       publishStatus: 'Published',
-      publishedOn: 'Aug 11, 2026 at 13:39',
+      publishedOn: 'Aug 11, 2026 at 01:39 PM',
       tags: ['Guangzhou'],
       categories: ['Keychain Mix'],
     },
@@ -222,7 +223,7 @@ export const INITIAL_CONSIGNMENTS: Record<string, Consignment> = {
     serviceType: 'Air Freight Priority',
     carrier: 'SAINEX Direct Air Network',
     awbNumber: 'CAN-SAINEX-067638406',
-    departureDate: 'Aug 07, 2026 - 14:00',
+    departureDate: 'Aug 07, 2026 - 02:00 PM',
     estimatedDelivery: 'Aug 12, 2026 - Delivered soon',
     cargoDetails: {
       pieces: 7,
@@ -246,7 +247,7 @@ export const INITIAL_CONSIGNMENTS: Record<string, Consignment> = {
     timeline: [
       {
         id: 't1',
-        timestamp: 'Aug 11, 2026 • 13:46 pm',
+        timestamp: 'Aug 11, 2026 • 01:46 PM',
         location: 'Bangladesh',
         title: 'At Bangladesh warehouse',
         description: 'Cargo received safely at SAIN Bangladesh Warehouse, customs inspection passed.',
@@ -254,7 +255,7 @@ export const INITIAL_CONSIGNMENTS: Record<string, Consignment> = {
       },
       {
         id: 't2',
-        timestamp: 'Aug 07, 2026 • 14:00 pm',
+        timestamp: 'Aug 07, 2026 • 02:00 PM',
         location: 'China',
         title: 'In Transit',
         description: 'Flight en route from Guangzhou to Hazrat Shahjalal International Airport (DAC).',
@@ -262,7 +263,7 @@ export const INITIAL_CONSIGNMENTS: Record<string, Consignment> = {
       },
       {
         id: 't3',
-        timestamp: 'Aug 01, 2026 • 19:47 pm',
+        timestamp: 'Aug 01, 2026 • 07:47 PM',
         location: 'China',
         title: 'Received at Guangzhou Hub',
         description: 'Cargo collected from supplier, 7 cartons packaged and barcode tagged.',
@@ -319,6 +320,38 @@ export function normalizeStatus(str: string): string {
 }
 
 /**
+ * Formats any raw time string into a clean 12-hour Bangladesh time format (e.g. '01:46 PM')
+ */
+export function formatToBDTime(timeStr?: string): string {
+  if (!timeStr) return '';
+  const clean = timeStr.trim();
+  const match = clean.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return clean;
+  let hour = parseInt(match[1], 10);
+  const min = match[2];
+  const lower = clean.toLowerCase();
+  let ampm = 'AM';
+
+  if (lower.includes('pm') && hour < 12) {
+    ampm = 'PM';
+  } else if (lower.includes('am') && hour === 12) {
+    hour = 12;
+    ampm = 'AM';
+  } else if (hour >= 12) {
+    ampm = 'PM';
+    if (hour > 12) hour -= 12;
+  } else if (hour === 0) {
+    hour = 12;
+    ampm = 'AM';
+  } else {
+    ampm = lower.includes('pm') ? 'PM' : 'AM';
+  }
+
+  const formattedHour = String(hour).padStart(2, '0');
+  return `${formattedHour}:${min} ${ampm}`;
+}
+
+/**
  * Returns current date and time formatted in Bangladesh Standard Time (UTC+6)
  */
 export function getBangladeshDateTime(dateObj: Date = new Date()): { date: string; time: string; formatted: string } {
@@ -329,7 +362,7 @@ export function getBangladeshDateTime(dateObj: Date = new Date()): { date: strin
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
-    }).toLowerCase(); // "01:24 pm"
+    }); // "01:24 PM"
     
     const formatted = dateObj.toLocaleDateString('en-US', {
       timeZone: 'Asia/Dhaka',
@@ -343,7 +376,7 @@ export function getBangladeshDateTime(dateObj: Date = new Date()): { date: strin
     const y = dateObj.getFullYear();
     const m = String(dateObj.getMonth() + 1).padStart(2, '0');
     const d = String(dateObj.getDate()).padStart(2, '0');
-    const timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toLowerCase();
+    const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     return {
       date: `${y}-${m}-${d}`,
       time: timeStr,
@@ -351,6 +384,7 @@ export function getBangladeshDateTime(dateObj: Date = new Date()): { date: strin
     };
   }
 }
+
 
 /**
  * Safely parse date and 12-hour/24-hour time to millisecond timestamp (prevents NaN bugs)
@@ -373,6 +407,20 @@ export function parseDateTimeToMillis(dateStr?: string, timeStr?: string): numbe
   if (dateParts.length < 3 || isNaN(dateParts[0])) return 0;
 
   return new Date(dateParts[0], dateParts[1] - 1, dateParts[2], hours, minutes).getTime();
+}
+
+function getDateMinusDays(baseDateStr: string, days: number): string {
+  try {
+    const d = new Date(baseDateStr);
+    if (!isNaN(d.getTime())) {
+      d.setDate(d.getDate() - days);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+  } catch {}
+  return baseDateStr;
 }
 
 /**
@@ -407,6 +455,149 @@ export function buildConsignmentTimeline(
       remarks: `Shipment status updated to ${normalizedCurrent}`,
     });
   }
+
+  // Ensure all prior lifecycle stages leading up to currentStatus exist so the timeline is full & complete
+  const baseActive = workingHistory.find(
+    (h) => normalizeStatus(h.status).toLowerCase() === normalizedCurrent.toLowerCase()
+  ) || workingHistory[0];
+  const baseDate = baseActive?.date || getBangladeshDateTime().date;
+
+  interface PrereqStage {
+    status: string;
+    location: string;
+    daysAgo: number;
+    defaultTime: string;
+    remarks: string;
+  }
+
+  const prereqMap: Record<number, PrereqStage[]> = {
+    // Rank 3 (In Transit / En Route) -> Prerequisite: Received, Pending
+    3: [
+      {
+        status: 'Received',
+        location: originCity,
+        daysAgo: 3,
+        defaultTime: '02:00 PM',
+        remarks: `Cargo collected from supplier, cartons packaged and barcode tagged at ${originCity} Hub.`,
+      },
+      {
+        status: 'Pending',
+        location: originCity,
+        daysAgo: 6,
+        defaultTime: '11:30 AM',
+        remarks: 'New shipment bill booked and electronic note registered.',
+      },
+    ],
+    // Rank 4 (On Hold / Customs) -> Prerequisite: In Transit, Received
+    4: [
+      {
+        status: 'In Transit',
+        location: `${originCity} to ${destinationCity}`,
+        daysAgo: 2,
+        defaultTime: '02:00 PM',
+        remarks: `Flight en route from ${originCity} to Hazrat Shahjalal International Airport (DAC).`,
+      },
+      {
+        status: 'Received',
+        location: originCity,
+        daysAgo: 6,
+        defaultTime: '07:47 PM',
+        remarks: `Cargo collected from supplier and verified at ${originCity} Hub.`,
+      },
+    ],
+    // Rank 5 (At Bangladesh warehouse) -> Prerequisite: In Transit, Received
+    5: [
+      {
+        status: 'In Transit',
+        location: `${originCity} to ${destinationCity}`,
+        daysAgo: 4,
+        defaultTime: '02:00 PM',
+        remarks: `Flight en route from ${originCity} to Hazrat Shahjalal International Airport (DAC).`,
+      },
+      {
+        status: 'Received',
+        location: originCity,
+        daysAgo: 10,
+        defaultTime: '07:47 PM',
+        remarks: `Cargo collected from supplier, packages barcode tagged at ${originCity} Cargo Terminal.`,
+      },
+    ],
+    // Rank 6 (Out for delivery) -> Prerequisite: At Bangladesh warehouse, In Transit, Received
+    6: [
+      {
+        status: 'At Bangladesh warehouse',
+        location: destinationCity,
+        daysAgo: 1,
+        defaultTime: '01:46 PM',
+        remarks: 'Cargo received safely at SAIN Bangladesh Warehouse, customs inspection passed.',
+      },
+      {
+        status: 'In Transit',
+        location: `${originCity} to ${destinationCity}`,
+        daysAgo: 4,
+        defaultTime: '02:00 PM',
+        remarks: `Flight en route from ${originCity} to Hazrat Shahjalal International Airport (DAC).`,
+      },
+      {
+        status: 'Received',
+        location: originCity,
+        daysAgo: 10,
+        defaultTime: '07:47 PM',
+        remarks: `Cargo collected from supplier, packages barcode tagged at ${originCity} Cargo Terminal.`,
+      },
+    ],
+    // Rank 7 (Delivered) -> Prerequisite: Out for delivery, At Bangladesh warehouse, In Transit, Received
+    7: [
+      {
+        status: 'Out for delivery',
+        location: destinationCity,
+        daysAgo: 1,
+        defaultTime: '10:00 AM',
+        remarks: 'Dispatched with delivery officer for final doorstep delivery.',
+      },
+      {
+        status: 'At Bangladesh warehouse',
+        location: destinationCity,
+        daysAgo: 2,
+        defaultTime: '01:46 PM',
+        remarks: 'Cargo received safely at SAIN Bangladesh Warehouse, customs inspection passed.',
+      },
+      {
+        status: 'In Transit',
+        location: `${originCity} to ${destinationCity}`,
+        daysAgo: 5,
+        defaultTime: '02:00 PM',
+        remarks: `Flight en route from ${originCity} to Hazrat Shahjalal International Airport (DAC).`,
+      },
+      {
+        status: 'Received',
+        location: originCity,
+        daysAgo: 11,
+        defaultTime: '07:47 PM',
+        remarks: `Cargo collected from supplier, packages barcode tagged at ${originCity} Cargo Terminal.`,
+      },
+    ],
+  };
+
+  const neededStages = prereqMap[currentRank] || [];
+  neededStages.forEach((stage, idx) => {
+    const stageNorm = stage.status.toLowerCase();
+    const alreadyExists = workingHistory.some(
+      (h) => normalizeStatus(h.status).toLowerCase() === stageNorm
+    );
+    if (!alreadyExists) {
+      workingHistory.push({
+        id: `h-pre-${stage.status.toLowerCase().replace(/\s+/g, '-')}-${idx}`,
+        date: getDateMinusDays(baseDate, stage.daysAgo),
+        time: stage.defaultTime,
+        location: stage.location,
+        status: stage.status,
+        updatedBy: 'SAIN International Logistics',
+        remarks: stage.remarks,
+      });
+    }
+  });
+
 
   // Sort descending:
   // 1. Primary: Exact timestamp
