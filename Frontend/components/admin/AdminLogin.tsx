@@ -46,7 +46,20 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [simulatedLink, setSimulatedLink] = useState<string | null>(null);
+  const [dispatchedEmail, setDispatchedEmail] = useState<string>('');
+  const [isDispatched, setIsDispatched] = useState(false);
+
+  // Registered admin email display
+  const getAdminEmail = () => {
+    try {
+      const stored = localStorage.getItem('sain_admin_profile');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.email) return parsed.email;
+      }
+    } catch {}
+    return 'saininternationallogistics@gmail.com';
+  };
 
   // Detect reset password token from URL query params (e.g. from email link)
   useEffect(() => {
@@ -85,77 +98,73 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
     return {};
   };
 
-  // 1. Handle Admin Login Form Submission
+  // 1. Handle Admin Login Form Submission (100% Server-Side Authenticated via Django)
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
     setIsLoading(true);
 
-    let validUser = 'sain_sakib6055';
-    let validPass = 'admin123';
-    let adminName = 'Sakib Ahmed (Super Administrator)';
-
-    try {
-      // Validate credentials against Central Neon DB first so password changes on any device work instantly
-      const remote = await fetchSiteConfigFromDb<any>(CONFIG_KEYS.ADMIN_PROFILE, null);
-      if (remote && remote.username) {
-        validUser = remote.username;
-        if (remote.password) validPass = remote.password;
-        if (remote.name) adminName = remote.name;
-        localStorage.setItem('sain_admin_profile', JSON.stringify(remote));
-      } else {
-        const storedCredsRaw = localStorage.getItem('sain_admin_profile');
-        if (storedCredsRaw) {
-          const parsed = JSON.parse(storedCredsRaw);
-          if (parsed.username) validUser = parsed.username;
-          if (parsed.password) validPass = parsed.password;
-          if (parsed.name) adminName = parsed.name;
-        }
-      }
-    } catch {
-      const storedCredsRaw = localStorage.getItem('sain_admin_profile');
-      if (storedCredsRaw) {
-        try {
-          const parsed = JSON.parse(storedCredsRaw);
-          if (parsed.username) validUser = parsed.username;
-          if (parsed.password) validPass = parsed.password;
-          if (parsed.name) adminName = parsed.name;
-        } catch {
-          // ignore
-        }
-      }
-    }
-
     const inputUser = username.trim();
     const inputPass = password.trim();
 
-    if (
-      (inputUser.toLowerCase() === validUser.toLowerCase() || inputUser.toLowerCase() === 'admin') &&
-      (inputPass === validPass || inputPass === 'admin123' || inputPass === 'sain2026')
-    ) {
+    if (!inputUser || !inputPass) {
       setIsLoading(false);
-      onLoginSuccess({ username: inputUser, name: adminName });
-    } else {
-      setIsLoading(false);
-      setError('Invalid username or password. Please verify your credentials.');
-    }
-  };
-
-  // 2. Handle Forgot Password Submission (Sends Reset Link via SMTP)
-  const handleForgotSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanEmail = forgotEmail.trim();
-    if (!cleanEmail) {
-      setError('Please enter a valid administrator email address.');
+      setError('Please provide both username and password.');
       return;
     }
 
+    try {
+      const baseUrl = getApiBaseUrl();
+      const res = await fetch(`${baseUrl}/api/v1/auth/login/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          username: inputUser,
+          password: inputPass,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.success) {
+        if (data.token) {
+          localStorage.setItem('sain_admin_token', data.token);
+        }
+        const profile = {
+          username: data.user?.username || inputUser,
+          name: data.user?.name || 'Administrator',
+          email: data.user?.email || '',
+        };
+        localStorage.setItem('sain_admin_profile', JSON.stringify(profile));
+        // Wipe legacy plain-text password if any
+        localStorage.removeItem('sain_admin_password');
+
+        setIsLoading(false);
+        onLoginSuccess({ username: profile.username, name: profile.name });
+        return;
+      } else {
+        setIsLoading(false);
+        setError(data.error || 'Invalid administrator username or password. Access denied.');
+        return;
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      setError('Network or server connection failed. Please check if the backend service is running.');
+    }
+  };
+
+  // 2. Handle Forgot Password Submission (Automatically sends reset link to admin email)
+  const handleForgotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError(null);
     setSuccess(null);
-    setSimulatedLink(null);
     setIsLoading(true);
 
+    const targetEmail = getAdminEmail();
     const resetBaseUrl = `${window.location.origin}/sain-sakib?action=reset-password`;
     const smtpConfig = getSmtpConfig();
 
@@ -164,7 +173,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
-          email: cleanEmail,
+          email: targetEmail,
           resetUrl: resetBaseUrl,
           smtpConfig,
         }),
@@ -173,36 +182,18 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
       const data = await res.json().catch(() => ({}));
 
       if (res.ok && data.success) {
-        if (data.simulated) {
-          setSuccess(
-            `Reset token generated successfully! SMTP credentials are not yet configured in settings.`
-          );
-          if (data.token) {
-            setResetToken(data.token);
-            setSimulatedLink(data.reset_link || `${resetBaseUrl}&token=${data.token}`);
-          }
-        } else {
-          setSuccess(
-            `A password reset link has been dispatched to ${cleanEmail}. Please check your inbox and click the link to reset your password.`
-          );
-        }
-      } else {
-        // Fallback local token generation if backend is offline or SMTP auth fails
-        const fallbackToken = 'local_' + Math.random().toString(36).substring(2, 15);
-        setResetToken(fallbackToken);
-        setSimulatedLink(`${resetBaseUrl}&token=${fallbackToken}`);
+        const confirmedEmail = data.email || targetEmail;
+        setDispatchedEmail(confirmedEmail);
+        setIsDispatched(true);
         setSuccess(
-          `Password reset request processed for ${cleanEmail}. Click the button below to proceed to the reset screen.`
+          `Password reset link has been dispatched to ${confirmedEmail}. Please check your inbox and click the reset button inside the email.`
         );
+      } else {
+        const errMsg = data.error || data.warning || 'Failed to dispatch reset email. Please ensure your SMTP configuration is active.';
+        setError(errMsg);
       }
     } catch {
-      // Offline fallback
-      const fallbackToken = 'local_' + Math.random().toString(36).substring(2, 15);
-      setResetToken(fallbackToken);
-      setSimulatedLink(`${resetBaseUrl}&token=${fallbackToken}`);
-      setSuccess(
-        `Password reset request processed. Click below to establish a new administrator password.`
-      );
+      setError('Unable to reach the server. Please check your internet or server connection and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -227,14 +218,32 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
     setIsLoading(true);
 
     try {
-      // 1. Update local storage profile
+      // 1. Call backend reset endpoint first to verify token and update password in Django MySQL
+      if (resetToken && !resetToken.startsWith('local_')) {
+        const res = await fetch(`${getApiBaseUrl()}/api/v1/auth/reset-password/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            token: resetToken,
+            new_password: newPassword,
+          }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+          setIsLoading(false);
+          setError(data.error || 'Reset link has expired or is invalid. Please request a new link.');
+          return;
+        }
+      }
+
+      // 2. Update local storage profile metadata (strictly without plain-text password)
       const stored = localStorage.getItem('sain_admin_profile');
-      let profile = {
+      let profile: Record<string, any> = {
         name: 'Sakib Ahmed',
-        username: 'sain_sakib6055',
-        email: forgotEmail || 'saininternationallogistics@gmail.com',
+        username: 'sain_sakib',
+        email: forgotEmail || getAdminEmail(),
         phone: '+880171906999',
-        password: newPassword,
         lastUpdated: new Date().toLocaleString('en-US', {
           dateStyle: 'medium',
           timeStyle: 'short',
@@ -244,10 +253,10 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
+          delete parsed.password;
           profile = {
             ...profile,
             ...parsed,
-            password: newPassword,
             lastUpdated: new Date().toLocaleString('en-US', {
               dateStyle: 'medium',
               timeStyle: 'short',
@@ -259,23 +268,8 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
       }
 
       localStorage.setItem('sain_admin_profile', JSON.stringify(profile));
+      localStorage.removeItem('sain_admin_password');
       saveSiteConfigToDb(CONFIG_KEYS.ADMIN_PROFILE, profile);
-
-      // 2. Call backend reset endpoint if token exists
-      if (resetToken && !resetToken.startsWith('local_')) {
-        try {
-          await fetch(`${getApiBaseUrl()}/api/v1/auth/reset-password/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify({
-              token: resetToken,
-              new_password: newPassword,
-            }),
-          });
-        } catch (e) {
-          console.info('Backend sync skipped:', e);
-        }
-      }
 
       // 3. Clear URL search query cleanly
       if (typeof window !== 'undefined') {
@@ -445,14 +439,11 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
                 <SainLogo variant="full" />
               </div>
 
-              <h2 className="text-xl font-bold font-brand tracking-tight text-white flex items-center justify-center gap-2">
-                <span>Account Recovery</span>
-                <span className="text-[10px] font-bold uppercase px-2 py-0.5 bg-amber-400 text-slate-950 rounded">
-                  SMTP Ready
-                </span>
+              <h2 className="text-xl font-bold font-brand tracking-tight text-white">
+                Account Recovery
               </h2>
               <p className="text-xs text-slate-300 mt-1">
-                Enter your administrative email to receive a secure password reset link
+                Password reset link will be dispatched to your registered administrator email
               </p>
             </div>
 
@@ -466,48 +457,44 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
               )}
 
               {success && (
-                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-medium space-y-3 animate-in fade-in">
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-medium space-y-2.5 animate-in fade-in">
                   <div className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>{success}</span>
-                  </div>
-
-                  {simulatedLink && (
-                    <div className="pt-2 border-t border-emerald-200/60">
-                      <p className="text-[11px] text-emerald-700 mb-2">
-                        You can immediately open the password reset interface below:
+                    <div>
+                      <p className="font-bold text-emerald-950 text-xs">Email Dispatched Successfully</p>
+                      <p className="text-emerald-800 text-xs mt-0.5 leading-relaxed">
+                        A password reset link has been dispatched to:
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAuthMode('reset');
-                          setError(null);
-                        }}
-                        className="w-full py-2 px-3 bg-[#1a6c7a] hover:bg-[#145561] text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                      >
-                        <KeyRound className="w-3.5 h-3.5 text-amber-300" />
-                        <span>Proceed to Reset Password</span>
-                      </button>
+                      <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 border border-emerald-300/80 rounded-lg font-mono text-xs font-bold text-emerald-900">
+                        <Mail className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                        <span>{dispatchedEmail || getAdminEmail()}</span>
+                      </div>
                     </div>
-                  )}
+                  </div>
+                  <div className="pt-2 border-t border-emerald-200/80 text-[11px] text-emerald-700 leading-relaxed">
+                    📩 Please check your email inbox and click the <strong>Proceed to Reset Password</strong> link inside the email to establish your new credentials (strictly valid for <strong>1 minute</strong> for maximum security).
+                  </div>
                 </div>
               )}
 
               <form onSubmit={handleForgotSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    Administrator Email Address
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="email"
-                      required
-                      value={forgotEmail}
-                      onChange={(e) => setForgotEmail(e.target.value)}
-                      placeholder="Enter Admin Email Address"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 pl-10 text-sm text-slate-900 focus:bg-white focus:border-[#1a6c7a] focus:ring-2 focus:ring-teal-500/10 outline-none transition font-medium"
-                    />
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-start gap-3">
+                  <div className="p-2 bg-amber-100 text-amber-700 rounded-xl mt-0.5 shrink-0">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                      Registered Admin Account
+                    </h4>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Clicking below will dispatch the secure one-time password recovery link directly to:
+                    </p>
+                    <div className="pt-1">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white border border-slate-300 text-slate-800 rounded-lg text-xs font-mono font-bold shadow-xs">
+                        <Mail className="w-3.5 h-3.5 text-[#1a6c7a] shrink-0" />
+                        <span>{getAdminEmail()}</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -519,11 +506,12 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
                   {isLoading ? (
                     <>
                       <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Sending Password Reset Link...</span>
+                      <span>Dispatching Reset Email...</span>
                     </>
                   ) : (
                     <>
-                      <span>Send Password Reset Link</span>
+                      <Mail className="w-4 h-4 text-amber-400" />
+                      <span>{isDispatched ? 'Resend Reset Link to Admin Email' : 'Send Reset Link to Admin Email'}</span>
                       <ArrowRight className="w-4 h-4 text-amber-400" />
                     </>
                   )}
