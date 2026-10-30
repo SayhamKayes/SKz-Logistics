@@ -56,14 +56,14 @@ export const HeroTrackingExperience: React.FC = () => {
   const [inputVal, setInputVal] = useState('');
   const [errorText, setErrorText] = useState('');
 
-  // High performance refs for animation loop
+  // High performance refs for smooth scroll animation loop
   const targetProgressRef = useRef(0);
   const currentProgressRef = useRef(0);
   const isHeroSeekingRef = useRef(false);
   const isTrackingSeekingRef = useRef(false);
   const rafIdRef = useRef<number | null>(null);
 
-  // Video loaded handlers - ensures frame 0.01s is immediately visible without unwanted poster images
+  // Initialize videos strictly paused at first frame 0.01s (zero autoplay)
   const handleHeroLoaded = useCallback(() => {
     const vid = heroVideoRef.current;
     if (vid) {
@@ -86,6 +86,24 @@ export const HeroTrackingExperience: React.FC = () => {
 
   const handleTrackingSeeked = useCallback(() => {
     isTrackingSeekingRef.current = false;
+  }, []);
+
+  // Ensure videos are paused and ready on mount
+  useEffect(() => {
+    const hVid = heroVideoRef.current;
+    const tVid = trackingVideoRef.current;
+    if (hVid) {
+      hVid.pause();
+      hVid.defaultMuted = true;
+      hVid.muted = true;
+      if (hVid.readyState >= 1) hVid.currentTime = 0.01;
+    }
+    if (tVid) {
+      tVid.pause();
+      tVid.defaultMuted = true;
+      tVid.muted = true;
+      if (tVid.readyState >= 1) tVid.currentTime = 0.01;
+    }
   }, []);
 
   // Tracking form submit handler
@@ -140,21 +158,11 @@ export const HeroTrackingExperience: React.FC = () => {
     };
   }, []);
 
-  // RequestAnimationFrame loop with LERP for smooth forward & backward scrubbing of both videos
+  // RequestAnimationFrame loop with LERP for smooth forward & backward scroll-driven video scrubbing (60fps)
   useEffect(() => {
-    const heroVid = heroVideoRef.current;
-    const trackingVid = trackingVideoRef.current;
-
-    if (heroVid) {
-      heroVid.pause();
-      heroVid.currentTime = 0.01;
-    }
-    if (trackingVid) {
-      trackingVid.pause();
-      trackingVid.currentTime = 0.01;
-    }
-
     let lastStateUpdate = 0;
+    let lastHeroSeekTime = 0;
+    let lastTrackingSeekTime = 0;
 
     const tick = (timestamp: number) => {
       const target = targetProgressRef.current;
@@ -162,7 +170,7 @@ export const HeroTrackingExperience: React.FC = () => {
       const diff = target - current;
 
       // Smooth interpolation towards target with 0.16 smoothing factor
-      if (Math.abs(diff) > 0.0003) {
+      if (Math.abs(diff) > 0.0002) {
         currentProgressRef.current += diff * 0.16;
       } else {
         currentProgressRef.current = target;
@@ -170,64 +178,57 @@ export const HeroTrackingExperience: React.FC = () => {
 
       const activeProgress = currentProgressRef.current;
 
-      // Throttle React state update to ~40fps / 25ms to keep UI super smooth without thrashing
-      if (timestamp - lastStateUpdate > 25) {
+      // Throttle React state update to ~60fps / 16ms
+      if (timestamp - lastStateUpdate > 16) {
         setScrollProgress(activeProgress);
         lastStateUpdate = timestamp;
       }
 
-      // Scrub Hero Video: from progress 0.05 to 0.28
-      if (heroVid) {
-        const heroDuration =
-          heroVid.duration && !isNaN(heroVid.duration) && heroVid.duration > 0
-            ? heroVid.duration
-            : 8.0;
+      // Safety watchdog: reset seeking flag if browser didn't emit 'seeked' within 60ms
+      if (isHeroSeekingRef.current && timestamp - lastHeroSeekTime > 60) {
+        isHeroSeekingRef.current = false;
+      }
+      if (isTrackingSeekingRef.current && timestamp - lastTrackingSeekTime > 60) {
+        isTrackingSeekingRef.current = false;
+      }
 
-        let heroTargetTime = 0.01;
-        if (activeProgress <= 0.05) {
-          heroTargetTime = 0.01;
-        } else if (activeProgress <= 0.28) {
-          heroTargetTime = ((activeProgress - 0.05) / (0.28 - 0.05)) * heroDuration;
-        } else {
-          heroTargetTime = heroDuration;
-        }
-        heroTargetTime = Math.min(
-          Math.max(heroTargetTime, 0.01),
-          Math.max(heroDuration - 0.02, 0.05)
-        );
+      // 1. Scrub Hero Video: strictly proportional to scroll across Hero Section (0.0 to 0.44)
+      const heroVid = heroVideoRef.current;
+      if (heroVid && heroVid.readyState >= 2) {
+        const heroDuration = heroVid.duration && !isNaN(heroVid.duration) && heroVid.duration > 0 ? heroVid.duration : 8.0;
+        const heroProgress = Math.min(Math.max(activeProgress / 0.44, 0), 1);
+        const targetTime = Math.min(Math.max(heroProgress * heroDuration, 0.01), heroDuration - 0.05);
+        const heroDiff = Math.abs(heroVid.currentTime - targetTime);
 
-        const heroDiff = Math.abs(heroVid.currentTime - heroTargetTime);
-        if (!isHeroSeekingRef.current && heroDiff > 0.03) {
+        if (heroDiff > 0.03 && !heroVid.seeking && !isHeroSeekingRef.current && (timestamp - lastHeroSeekTime > 32)) {
           isHeroSeekingRef.current = true;
-          heroVid.currentTime = heroTargetTime;
+          lastHeroSeekTime = timestamp;
+
+          if ('fastSeek' in heroVid && typeof (heroVid as any).fastSeek === 'function') {
+            (heroVid as any).fastSeek(targetTime);
+          } else {
+            heroVid.currentTime = targetTime;
+          }
         }
       }
 
-      // Scrub Tracking Video: from progress 0.52 to 0.70
-      if (trackingVid) {
-        const trackingDuration =
-          trackingVid.duration && !isNaN(trackingVid.duration) && trackingVid.duration > 0
-            ? trackingVid.duration
-            : 10.0;
+      // 2. Scrub Tracking Video: strictly proportional to scroll across Tracking Section (0.44 to 0.85)
+      const trackingVid = trackingVideoRef.current;
+      if (trackingVid && trackingVid.readyState >= 2) {
+        const trackingDuration = trackingVid.duration && !isNaN(trackingVid.duration) && trackingVid.duration > 0 ? trackingVid.duration : 10.0;
+        const trackingProgress = Math.min(Math.max((activeProgress - 0.44) / (0.85 - 0.44), 0), 1);
+        const targetTime = Math.min(Math.max(trackingProgress * trackingDuration, 0.01), trackingDuration - 0.05);
+        const trackingDiff = Math.abs(trackingVid.currentTime - targetTime);
 
-        let trackingTargetTime = 0.01;
-        if (activeProgress < 0.52) {
-          trackingTargetTime = 0.01;
-        } else if (activeProgress <= 0.70) {
-          trackingTargetTime =
-            ((activeProgress - 0.52) / (0.70 - 0.52)) * trackingDuration;
-        } else {
-          trackingTargetTime = trackingDuration;
-        }
-        trackingTargetTime = Math.min(
-          Math.max(trackingTargetTime, 0.01),
-          Math.max(trackingDuration - 0.02, 0.05)
-        );
-
-        const trackingDiff = Math.abs(trackingVid.currentTime - trackingTargetTime);
-        if (!isTrackingSeekingRef.current && trackingDiff > 0.03) {
+        if (trackingDiff > 0.03 && !trackingVid.seeking && !isTrackingSeekingRef.current && (timestamp - lastTrackingSeekTime > 32)) {
           isTrackingSeekingRef.current = true;
-          trackingVid.currentTime = trackingTargetTime;
+          lastTrackingSeekTime = timestamp;
+
+          if ('fastSeek' in trackingVid && typeof (trackingVid as any).fastSeek === 'function') {
+            (trackingVid as any).fastSeek(targetTime);
+          } else {
+            trackingVid.currentTime = targetTime;
+          }
         }
       }
 
@@ -292,7 +293,7 @@ export const HeroTrackingExperience: React.FC = () => {
     <section
       ref={containerRef}
       id="hero-scroll-container"
-      className="relative w-full h-[700vh]"
+      className="relative w-full h-[500vh]"
     >
       {/* Sticky Fullscreen Viewport pinned during the entire journey */}
       <div className="sticky top-0 h-screen w-full overflow-hidden">
@@ -307,7 +308,7 @@ export const HeroTrackingExperience: React.FC = () => {
             pointerEvents: slidePhase > 0.6 ? 'none' : 'auto',
           }}
         >
-          {/* Hero Background Video - purely showing the video frame 0.0s (Image 3) without any poster */}
+          {/* Hero Background Video - purely scroll-driven playback with hardware acceleration */}
           <div className="absolute inset-0 select-none pointer-events-none overflow-hidden bg-slate-950">
             <video
               ref={heroVideoRef}
@@ -431,7 +432,7 @@ export const HeroTrackingExperience: React.FC = () => {
             pointerEvents: slidePhase > 0.5 ? 'auto' : 'none',
           }}
         >
-          {/* Tracking Background Video - purely showing the video frame 0.0s without any poster */}
+          {/* Tracking Background Video - purely scroll-driven playback with hardware acceleration */}
           <div className="absolute inset-0 select-none pointer-events-none overflow-hidden bg-slate-950">
             <video
               ref={trackingVideoRef}
