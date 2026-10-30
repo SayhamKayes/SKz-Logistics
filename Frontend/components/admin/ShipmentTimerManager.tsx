@@ -310,7 +310,7 @@ export const ShipmentTimerManager: React.FC = () => {
       setSaveModal({
         isOpen: true,
         title: 'Timers Changes Saved!',
-        message: 'Active shipment timers and arrival schedules are saved to Central Neon Database and live across all devices.',
+        message: 'Active shipment timers and arrival schedules are saved to Central Database and live across all devices.',
         type: 'success',
       });
     } else {
