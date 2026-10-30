@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTracking } from '../../Context/TrackingContext';
-import { Consignment, PackageItem, ShipmentHistoryItem, getStatusProgressAndColor, buildConsignmentTimeline, normalizeStatus, getBangladeshDateTime } from '../../services/trackingData';
+import { Consignment, PackageItem, ShipmentHistoryItem, getStatusProgressAndColor, buildConsignmentTimeline, normalizeStatus, getBangladeshDateTime, formatToBDTime } from '../../services/trackingData';
 import { recordAdminHistory } from '../../services/adminHistoryService';
 import { saveSiteConfigToDb, fetchSiteConfigFromDb, CONFIG_KEYS } from '../../services/siteConfigService';
 import { WaybillPrintModal } from './WaybillPrintModal';
@@ -70,6 +70,7 @@ export const ShipmentManager: React.FC = () => {
     title: string;
     message: string;
     confirmText?: string;
+    cancelText?: string;
     type?: 'danger' | 'warning' | 'info';
     onConfirm: () => void;
   } | null>(null);
@@ -126,6 +127,7 @@ export const ShipmentManager: React.FC = () => {
       const stored = localStorage.getItem('sain_custom_employees');
       if (stored) return JSON.parse(stored);
     } catch { }
+    return DEFAULT_EMPLOYEES;
   });
 
   // Sync custom dropdown catalogs and trash from Central Neon DB on mount
@@ -244,7 +246,8 @@ export const ShipmentManager: React.FC = () => {
   const [courier, setCourier] = useState(currentConsignment?.shipmentDetails?.courier || 'SAIN INTERNATIONAL LOGISTICS');
   const [mode, setMode] = useState(currentConsignment?.shipmentDetails?.mode || 'Air Freight');
   const [quantity, setQuantity] = useState(currentConsignment?.shipmentDetails?.quantity || '7 Box');
-  const [totalFreight, setTotalFreight] = useState(currentConsignment?.shipmentDetails?.totalFreight || '৳ 12,500');
+  const [totalFreight, setTotalFreight] = useState(currentConsignment?.shipmentDetails?.totalFreight || 'BDT 12,500');
+
   const [carrierRefNo, setCarrierRefNo] = useState(currentConsignment?.shipmentDetails?.carrierReferenceNo || 'CRN-884920');
   const [origin, setOrigin] = useState(currentConsignment?.shipmentDetails?.origin || 'China');
   const [pickupDate, setPickupDate] = useState(currentConsignment?.shipmentDetails?.pickupDate || '2026-08-01');
@@ -438,15 +441,89 @@ export const ShipmentManager: React.FC = () => {
     }, 0);
   }, [packages]);
 
+  // Live real-time consignment data for instant waybill and invoice printing
+  const livePrintConsignment = useMemo(() => {
+    if (!currentConsignment) return null;
+    return {
+      ...currentConsignment,
+      consignmentNo: consignmentNo || currentConsignment.consignmentNo,
+      shipper: {
+        name: shipperName || currentConsignment.shipper?.name || 'SAIN',
+        phone: shipperPhone || currentConsignment.shipper?.phone || '+880171906999',
+        address: shipperAddress || currentConsignment.shipper?.address || '15/B, Uttara Metro Center, Dhaka 1230 Bangladesh',
+        email: shipperEmail || currentConsignment.shipper?.email || 'saininternationallogistics@gmail.com',
+      },
+      receiver: {
+        name: receiverName || currentConsignment.receiver?.name || 'Muhammad Tahin',
+        phone: receiverPhone || currentConsignment.receiver?.phone || '+8801731939325',
+        address: receiverAddress || currentConsignment.receiver?.address || 'Basundhara Residential Area, Dhaka',
+        email: receiverEmail || currentConsignment.receiver?.email || 'ocuna123@gmail.com',
+      },
+      packagesData: packages && packages.length > 0 ? packages : currentConsignment.packagesData,
+      shipmentDetails: {
+        ...(currentConsignment.shipmentDetails || {}),
+        typeOfShipment: typeOfShipment || currentConsignment.shipmentDetails?.typeOfShipment || 'Air Freight',
+        weightText: weightText || currentConsignment.shipmentDetails?.weightText || 'around 1500g',
+        packagesCount: String(packages.length || currentConsignment.shipmentDetails?.packagesCount || 1),
+        product: product || currentConsignment.shipmentDetails?.product || '',
+        paymentMode: paymentMode || currentConsignment.shipmentDetails?.paymentMode || 'CASH',
+        carrier: carrier || currentConsignment.shipmentDetails?.carrier || 'SAINEX',
+        departureTimeStr: departureTime || currentConsignment.shipmentDetails?.departureTimeStr || '18:52 pm',
+        destination: destination || currentConsignment.shipmentDetails?.destination || 'Bangladesh',
+        pickupTimeStr: pickupTime || currentConsignment.shipmentDetails?.pickupTimeStr || '10:00 am',
+        courier: courier || currentConsignment.shipmentDetails?.courier || 'SAIN INTERNATIONAL LOGISTICS',
+        mode: mode || currentConsignment.shipmentDetails?.mode || 'Air Freight',
+        quantity: quantity || currentConsignment.shipmentDetails?.quantity || `${packages.length} Box`,
+        totalFreight: (totalFreight || currentConsignment.shipmentDetails?.totalFreight || 'BDT 12,500').replace(/৳/g, 'BDT ').trim(),
+
+        carrierReferenceNo: carrierRefNo || currentConsignment.shipmentDetails?.carrierReferenceNo || 'CRN-884920',
+        origin: origin || currentConsignment.shipmentDetails?.origin || 'China',
+        pickupDate: pickupDate || currentConsignment.shipmentDetails?.pickupDate || '2026-08-01',
+        expectedDeliveryDate: expectedDeliveryDate || currentConsignment.shipmentDetails?.expectedDeliveryDate || '2026-08-12',
+        comments: comments || currentConsignment.shipmentDetails?.comments || '',
+      },
+    };
+  }, [
+    currentConsignment,
+    consignmentNo,
+    shipperName,
+    shipperPhone,
+    shipperAddress,
+    shipperEmail,
+    receiverName,
+    receiverPhone,
+    receiverAddress,
+    receiverEmail,
+    packages,
+    typeOfShipment,
+    weightText,
+    product,
+    paymentMode,
+    carrier,
+    departureTime,
+    destination,
+    pickupTime,
+    courier,
+    mode,
+    quantity,
+    totalFreight,
+    carrierRefNo,
+    origin,
+    pickupDate,
+    expectedDeliveryDate,
+    comments,
+  ]);
+
   // ==========================================================
   // MILESTONE / HISTORY HANDLERS & PAGINATION (10 items per page)
   // ==========================================================
   const [historyPage, setHistoryPage] = useState(1);
   const historyItemsPerPage = 10;
-  const totalHistoryPages = Math.max(1, Math.ceil(shipmentHistory.length / historyItemsPerPage));
+  const totalHistoryPages = Math.max(1, Math.ceil((shipmentHistory || []).length / historyItemsPerPage));
   const paginatedHistory = useMemo(() => {
+    const list = shipmentHistory || [];
     const start = (historyPage - 1) * historyItemsPerPage;
-    return shipmentHistory.slice(start, start + historyItemsPerPage);
+    return list.slice(start, start + historyItemsPerPage);
   }, [shipmentHistory, historyPage]);
 
   const handleAddMilestone = () => {
@@ -755,11 +832,12 @@ export const ShipmentManager: React.FC = () => {
     const syncRes = await addConsignment(newTemplateConsignment);
     setSelectedNo(newBillNo);
     if (syncRes && syncRes.success) {
-      setSaveSuccessMsg(`New Bill ${newBillNo} created & registered in Central Neon Database! Fill details and click Update to save.`);
+      setSaveSuccessMsg(`New Bill ${newBillNo} created & registered in Central Database! Fill details and click Update to save.`);
     } else {
       setSaveSuccessMsg(`New Bill template generated (${newBillNo})! (Saved locally: ${syncRes?.error || 'central DB offline'}).`);
     }
     setTimeout(() => setSaveSuccessMsg(null), 6000);
+
   };
 
   // ==========================================================
@@ -770,10 +848,12 @@ export const ShipmentManager: React.FC = () => {
     setConfirmModal({
       isOpen: true,
       title: 'Move Consignment to Trash?',
-      message: `Move consignment ${consignmentNo} to Trash? You can restore it anytime from the Recycle Bin.`,
-      confirmText: 'Move to Trash',
+      message: `Move consignment ${consignmentNo} to Recycle Bin? You can restore it anytime or delete it permanently from Trash.`,
+      confirmText: 'Yes, Move to Trash',
+      cancelText: 'Cancel',
       type: 'warning',
       onConfirm: () => {
+        setConfirmModal(null);
         const updatedTrash = {
           ...trashedConsignments,
           [consignmentNo]: {
@@ -797,7 +877,7 @@ export const ShipmentManager: React.FC = () => {
           });
         } catch {}
 
-        setSaveSuccessMsg(`Consignment ${consignmentNo} moved to Trash (Recycle Bin & Database).`);
+        setSaveSuccessMsg(`Consignment ${consignmentNo} moved to Trash (Recycle Bin).`);
         setTimeout(() => setSaveSuccessMsg(null), 3500);
 
         // Select another active consignment
@@ -805,7 +885,6 @@ export const ShipmentManager: React.FC = () => {
         if (remainingKeys.length > 0) {
           setSelectedNo(remainingKeys[0]);
         }
-        setConfirmModal(null);
       },
     });
   };
@@ -843,15 +922,21 @@ export const ShipmentManager: React.FC = () => {
     setConfirmModal({
       isOpen: true,
       title: 'Permanently Delete Consignment?',
-      message: `Permanently delete ${noToDelete}? This action cannot be undone and will remove all history records.`,
-      confirmText: 'Delete Permanently',
+      message: `Permanently delete consignment ${noToDelete}? This action cannot be undone and will permanently remove all records from the central database.`,
+      confirmText: 'Yes, Delete Permanently',
+      cancelText: 'Cancel',
       type: 'danger',
       onConfirm: async () => {
+        setConfirmModal(null);
         const copy = { ...trashedConsignments };
         delete copy[noToDelete];
         setTrashedConsignments(copy);
         localStorage.setItem('sain_trashed_consignments', JSON.stringify(copy));
         saveSiteConfigToDb(CONFIG_KEYS.TRASHED_CONSIGNMENTS, copy);
+
+        setSaveSuccessMsg(`Consignment ${noToDelete} has been permanently deleted.`);
+        setTimeout(() => setSaveSuccessMsg(null), 3500);
+
         try {
           await deleteConsignment(noToDelete);
         } catch (e) {
@@ -868,10 +953,47 @@ export const ShipmentManager: React.FC = () => {
             description: `Permanently deleted consignment ${noToDelete} from the system database.`,
           });
         } catch {}
+      },
+    });
+  };
 
-        setSaveSuccessMsg(`Consignment ${noToDelete} permanently deleted.`);
-        setTimeout(() => setSaveSuccessMsg(null), 3000);
+  const handleEmptyTrash = () => {
+    const trashedKeys = Object.keys(trashedConsignments);
+    if (trashedKeys.length === 0) return;
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Empty Entire Recycle Bin?',
+      message: `Permanently delete all ${trashedKeys.length} consignment(s) currently in the Recycle Bin? This action cannot be undone.`,
+      confirmText: 'Yes, Empty Recycle Bin',
+      cancelText: 'Cancel',
+      type: 'danger',
+      onConfirm: async () => {
         setConfirmModal(null);
+        setTrashedConsignments({});
+        localStorage.setItem('sain_trashed_consignments', JSON.stringify({}));
+        saveSiteConfigToDb(CONFIG_KEYS.TRASHED_CONSIGNMENTS, {});
+
+        setSaveSuccessMsg(`All ${trashedKeys.length} consignment(s) in Recycle Bin permanently deleted.`);
+        setTimeout(() => setSaveSuccessMsg(null), 3500);
+
+        for (const no of trashedKeys) {
+          try {
+            await deleteConsignment(no);
+          } catch (e) {
+            console.warn('Failed to delete:', no, e);
+          }
+        }
+
+        try {
+          recordAdminHistory({
+            module: 'shipments',
+            moduleLabel: 'Shipment Manager',
+            actionType: 'delete',
+            actionLabel: 'Emptied Recycle Bin',
+            description: `Permanently deleted ${trashedKeys.length} consignment(s) from Recycle Bin.`,
+          });
+        } catch {}
       },
     });
   };
@@ -882,7 +1004,7 @@ export const ShipmentManager: React.FC = () => {
   const handleSaveShipment = async () => {
     const bdNow = getBangladeshDateTime();
     const effectiveDate = publishDate || bdNow.date;
-    const effectiveTime = publishTime || bdNow.time;
+    const effectiveTime = formatToBDTime(publishTime || bdNow.time);
     setPublishedOn(bdNow.formatted);
 
     const liveStatus = normalizeStatus((publishCurrentStatus as any) || currentConsignment?.status || 'At Bangladesh warehouse');
@@ -913,10 +1035,19 @@ export const ShipmentManager: React.FC = () => {
       };
       updatedHistory = [newCheckpoint, ...updatedHistory];
     }
-    setShipmentHistory(updatedHistory);
-
     // Build timeline in real-time from the shipment history checkpoints, newest first, with active milestone matching liveStatus
     const liveTimeline = buildConsignmentTimeline(liveStatus, updatedHistory, origin, destination);
+
+    const timelineHistory: ShipmentHistoryItem[] = liveTimeline.map((t, idx) => ({
+      id: `h-${idx}-${Date.now()}`,
+      date: t.timestamp?.includes('•') ? t.timestamp.split('•')[0].trim() : effectiveDate,
+      time: t.timestamp?.includes('•') ? t.timestamp.split('•')[1].trim() : effectiveTime,
+      location: t.location,
+      status: t.title,
+      updatedBy: 'SAIN International Logistics',
+      remarks: t.description,
+    }));
+    setShipmentHistory(timelineHistory);
 
     const cleanNo = consignmentNo.trim().toUpperCase();
 
@@ -967,7 +1098,8 @@ export const ShipmentManager: React.FC = () => {
         comments,
       },
       packagesData: packages,
-      shipmentHistory: updatedHistory,
+      shipmentHistory: timelineHistory,
+
       adminMetadata: {
         client,
         agentName: selectedAgent,
@@ -1015,10 +1147,11 @@ export const ShipmentManager: React.FC = () => {
       setTimeout(() => setStatusToast(null), 2500);
 
       if (syncRes && syncRes.success) {
-        setSaveSuccessMsg(`Bill ${updated.consignmentNo} updated & saved to Central Neon Database! Live tracking synchronized in real time.`);
+        setSaveSuccessMsg(`Bill ${updated.consignmentNo} updated & saved to Central Database! Live tracking synchronized in real time.`);
       } else {
         setSaveSuccessMsg(`Saved locally in browser cache. ⚠️ Central Database sync warning: ${syncRes?.error || 'Server unreachable'}`);
       }
+
       setTimeout(() => setSaveSuccessMsg(null), 5000);
 
       // Record into Admin Activity History Memory
@@ -1079,6 +1212,17 @@ export const ShipmentManager: React.FC = () => {
               <span>Trash / Recycle Bin ({trashedEntries.length})</span>
             </h3>
           </div>
+
+          {trashedEntries.length > 0 && (
+            <button
+              type="button"
+              onClick={handleEmptyTrash}
+              className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Empty Recycle Bin</span>
+            </button>
+          )}
         </div>
 
         {saveSuccessMsg && (
@@ -1134,6 +1278,20 @@ export const ShipmentManager: React.FC = () => {
             </table>
           )}
         </div>
+
+        {/* Custom Confirm Modal directly mounted inside Trash View */}
+        {confirmModal && (
+          <ConfirmModal
+            isOpen={confirmModal.isOpen}
+            title={confirmModal.title}
+            message={confirmModal.message}
+            confirmText={confirmModal.confirmText}
+            cancelText={confirmModal.cancelText}
+            type={confirmModal.type}
+            onConfirm={confirmModal.onConfirm}
+            onCancel={() => setConfirmModal(null)}
+          />
+        )}
       </div>
     );
   }
@@ -1642,10 +1800,11 @@ export const ShipmentManager: React.FC = () => {
                   <input
                     type="text"
                     value={totalFreight}
-                    onChange={(e) => setTotalFreight(e.target.value)}
-                    placeholder="৳ 12,500"
+                    onChange={(e) => setTotalFreight(e.target.value.replace(/৳/g, 'BDT '))}
+                    placeholder="BDT 12,500"
                     className="w-full text-xs border border-slate-300 rounded-lg px-3 py-2 outline-none focus:border-emerald-600"
                   />
+
                 </div>
 
                 <div>
@@ -2210,7 +2369,7 @@ export const ShipmentManager: React.FC = () => {
                 onChange={(e) => setEmployee(e.target.value)}
                 className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white text-slate-800 font-medium"
               >
-                {employees.map((emp) => (
+                {(employees || []).map((emp) => (
                   <option key={emp} value={emp}>
                     {emp}
                   </option>
@@ -2218,7 +2377,7 @@ export const ShipmentManager: React.FC = () => {
               </select>
 
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {employees.filter((emp) => !emp.startsWith('--')).map((emp) => (
+                {(employees || []).filter((emp) => !emp.startsWith('--')).map((emp) => (
                   <span
                     key={emp}
                     className="inline-flex items-center gap-1 text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200 max-w-full"
@@ -2280,14 +2439,17 @@ export const ShipmentManager: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Time</label>
+                <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Time (BD BST)</label>
                 <input
                   type="text"
                   value={publishTime}
                   onChange={(e) => setPublishTime(e.target.value)}
+                  onBlur={() => setPublishTime(formatToBDTime(publishTime))}
+                  placeholder="e.g. 08:30 PM"
                   className="w-full border border-slate-300 rounded-lg px-2 py-1 text-xs"
                 />
               </div>
+
             </div>
 
             <div>
@@ -2459,10 +2621,10 @@ export const ShipmentManager: React.FC = () => {
         </div>
       </div>
 
-      {/* Printable Waybill Modal */}
-      {currentConsignment && (
+      {/* Printable Waybill Modal (Live dynamic form sync) */}
+      {isWaybillOpen && livePrintConsignment && (
         <WaybillPrintModal
-          consignment={currentConsignment}
+          consignment={livePrintConsignment}
           isOpen={isWaybillOpen}
           onClose={() => setIsWaybillOpen(false)}
         />
@@ -2475,6 +2637,7 @@ export const ShipmentManager: React.FC = () => {
           title={confirmModal.title}
           message={confirmModal.message}
           confirmText={confirmModal.confirmText}
+          cancelText={confirmModal.cancelText}
           type={confirmModal.type}
           onConfirm={confirmModal.onConfirm}
           onCancel={() => setConfirmModal(null)}
