@@ -15,7 +15,6 @@ import {
   Weight,
   Layers,
   FileText,
-  Printer,
   Share2,
   ExternalLink,
   ShieldCheck,
@@ -105,10 +104,6 @@ export const TrackingModal: React.FC = () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
-  };
-
-  const handlePrint = () => {
-    window.print();
   };
 
   return (
@@ -584,13 +579,6 @@ export const TrackingModal: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-2">
-                <button
-                  onClick={handlePrint}
-                  className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-medium transition flex items-center gap-1.5"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print Waybill</span>
-                </button>
                 <a
                   href={`https://wa.me/${phoneNumber}?text=Hello%20SAIN%20Logistics,%20I%20am%20inquiring%20about%20my%20consignment%20${activeConsignment.consignmentNo}`}
                   target="_blank"
