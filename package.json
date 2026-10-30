@@ -10,6 +10,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
+    "package:cpanel": "powershell -ExecutionPolicy Bypass -File scripts/build_deploy_zip.ps1",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
