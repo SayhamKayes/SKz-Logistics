@@ -167,18 +167,19 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (res.ok) {
           const list = await res.json();
           if (Array.isArray(list) && list.length > 0) {
-            setAllConsignments((prev) => {
-              const merged = { ...prev };
-              list.forEach((item: any) => {
-                if (item.consignment_no && !DEMO_CONSIGNMENT_KEYS.includes(item.consignment_no)) {
-                  merged[item.consignment_no] = mapDjangoToConsignment(item);
-                }
-              });
-              try {
-                localStorage.setItem(LOCAL_STORAGE_CONSIGNMENTS_KEY, JSON.stringify(merged));
-              } catch {}
-              return merged;
+            const dbConsignments: Record<string, Consignment> = {};
+            list.forEach((item: any) => {
+              if (item.consignment_no && !DEMO_CONSIGNMENT_KEYS.includes(item.consignment_no)) {
+                dbConsignments[item.consignment_no] = mapDjangoToConsignment(item);
+              }
             });
+            // Central Database is the pure source of truth: ensures 100% sync across Desktop, MacBook, and Mobile
+            if (Object.keys(dbConsignments).length > 0) {
+              setAllConsignments(dbConsignments);
+              try {
+                localStorage.setItem(LOCAL_STORAGE_CONSIGNMENTS_KEY, JSON.stringify(dbConsignments));
+              } catch {}
+            }
           }
         }
       } catch (e) {
@@ -316,7 +317,8 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         courier: data.carrier || 'SAIN INTERNATIONAL LOGISTICS',
         mode: data.type_of_shipment || 'Air Freight',
         quantity: data.quantity || '7 Box',
-        totalFreight: data.total_freight || '৳ 12,500',
+        totalFreight: (data.total_freight || 'BDT 12,500').replace(/৳/g, 'BDT ').trim(),
+
         carrierReferenceNo: data.carrier_reference_no || 'CRN-884920',
         origin: data.origin_country || 'China',
         pickupDate: data.pickup_date || '2026-08-01',
@@ -498,7 +500,7 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         departure_time_str: consignment.shipmentDetails?.departureTimeStr || '18:52 pm',
         pickup_time_str: consignment.shipmentDetails?.pickupTimeStr || '',
         quantity: consignment.shipmentDetails?.quantity || '1 Box',
-        total_freight: consignment.shipmentDetails?.totalFreight || '',
+        total_freight: (consignment.shipmentDetails?.totalFreight || '').replace(/৳/g, 'BDT ').trim(),
         carrier_reference_no: consignment.shipmentDetails?.carrierReferenceNo || '',
         origin_country: consignment.shipmentDetails?.origin || consignment.origin?.country || 'China',
         destination_country: consignment.shipmentDetails?.destination || consignment.destination?.country || 'Bangladesh',
@@ -513,15 +515,31 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         published_status: consignment.adminMetadata?.publishedOn || 'Published',
         tags: consignment.adminMetadata?.tags?.join(',') || 'Guangzhou',
         category: consignment.adminMetadata?.categories?.join(',') || 'Keychain Mix',
-        milestones: consignment.shipmentHistory?.map((sh) => ({
-          title: sh.status,
-          location: sh.location,
-          status: sh.status,
-          date_str: sh.date,
-          time_str: sh.time,
-          updated_by: sh.updatedBy,
-          remarks: sh.remarks,
-        })) || [],
+        milestones: (consignment.timeline && consignment.timeline.length > 0
+          ? consignment.timeline.map((t) => {
+              const datePart = t.timestamp?.includes('•') ? t.timestamp.split('•')[0].trim() : '';
+              const timePart = t.timestamp?.includes('•') ? t.timestamp.split('•')[1].trim() : '';
+              return {
+                title: String(t.title || 'Update').slice(0, 250),
+                location: String(t.location || 'Dhaka').slice(0, 250),
+                status: String(t.title || 'In Transit').slice(0, 60),
+                date_str: String(datePart || '').slice(0, 60),
+                time_str: String(timePart || '').slice(0, 60),
+                updated_by: 'SAIN International Logistics',
+                remarks: String(t.description || '').slice(0, 450),
+              };
+            })
+          : consignment.shipmentHistory?.map((sh) => ({
+              title: String(sh.status || 'Update').slice(0, 250),
+              location: String(sh.location || 'Dhaka').slice(0, 250),
+              status: String(sh.status || 'In Transit').slice(0, 60),
+              date_str: String(sh.date || '').slice(0, 60),
+              time_str: String(sh.time || '').slice(0, 60),
+              updated_by: String(sh.updatedBy || 'SAIN International Logistics').slice(0, 120),
+              remarks: String(sh.remarks || '').slice(0, 450),
+            }))
+        ) || [],
+
       };
 
       const controller = new AbortController();
@@ -536,9 +554,15 @@ export const TrackingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       clearTimeout(timeoutId);
 
       if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
-        const errMsg = `Database responded with status ${res.status}: ${JSON.stringify(errJson || '')}`;
-        console.warn('Django sync returned status', res.status, errJson);
+        let errDetail = '';
+        try {
+          const errJson = await res.json();
+          errDetail = errJson.error ? JSON.stringify(errJson.error) : JSON.stringify(errJson);
+        } catch {
+          errDetail = await res.text().catch(() => '');
+        }
+        const errMsg = `Database responded with status ${res.status}: ${errDetail || 'Internal Server Error'}`;
+        console.warn('Django sync returned status', res.status, errDetail);
         return { success: false, error: errMsg, consignmentNo: consignment.consignmentNo };
       }
 
