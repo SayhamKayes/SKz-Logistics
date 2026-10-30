@@ -235,7 +235,7 @@ export const ServicesContentEditor: React.FC = () => {
       setSaveModal({
         isOpen: true,
         title: 'Services Changes Saved!',
-        message: 'Freight service offerings and catalog cards are saved to Central Neon Database and live across all devices.',
+        message: 'Freight service offerings and catalog cards are saved to Central Database and live across all devices.',
         type: 'success',
       });
     } else {
