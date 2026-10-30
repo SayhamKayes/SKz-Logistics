@@ -10,6 +10,7 @@ import { AdminPage } from './pages/AdminPage';
 import { TrackingModal } from './components/TrackingModal';
 import { syncAllSiteConfigsFromDb } from './services/siteConfigService';
 import { Preloader } from './components/Preloader';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 const AppContent: React.FC = () => {
   const { activeTab } = useTracking();
@@ -41,9 +42,11 @@ const AppContent: React.FC = () => {
 
 export default function App() {
   return (
-    <TrackingProvider>
-      <Preloader />
-      <AppContent />
-    </TrackingProvider>
+    <ErrorBoundary>
+      <TrackingProvider>
+        <Preloader />
+        <AppContent />
+      </TrackingProvider>
+    </ErrorBoundary>
   );
 }
